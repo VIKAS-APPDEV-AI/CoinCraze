@@ -1,8 +1,9 @@
 import 'dart:async';
 import 'package:coincraze/AuthManager.dart';
+import 'package:coincraze/BottomBar.dart';
 import 'package:coincraze/Constants/API.dart';
-import 'package:coincraze/Models/SpotOrderMode.dart';
 import 'package:coincraze/Services/api_service.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -24,6 +25,8 @@ class _ChartScreenState extends State<ChartScreen>
   String changePercent = "0.00%";
   bool isLoading = true;
   bool isCoinLoading = true;
+  bool isOrdersLoading = false;
+  bool isTradeHistoryLoading = false;
   Timer? _timer;
   String selectedCoin = 'bitcoin';
   List<String> coinOptions = [];
@@ -37,14 +40,16 @@ class _ChartScreenState extends State<ChartScreen>
   List<Map<String, dynamic>> userOrders = [];
   late WebViewController _webViewController;
   String? chartErrorMessage;
+  String? ordersErrorMessage;
+  String? tradeHistoryErrorMessage;
   WebSocketChannel? _orderBookChannel;
   String? cryptoWalletId;
   String? fiatWalletId;
   double fiatBalance = 0.0;
   double cryptoBalance = 0.0;
-  final userId = AuthManager().userId;
+  final String? userId = AuthManager().userId;
   bool isAmountInCrypto = true;
-  final ApiService _apiService = ApiService(); // Initialize ApiService
+  final ApiService _apiService = ApiService();
 
   final Map<String, Map<String, String>> coinSymbolMap = {
     'bitcoin': {'tradingview': 'BTCUSD', 'coinbase': 'BTC-USD'},
@@ -66,13 +71,13 @@ class _ChartScreenState extends State<ChartScreen>
     fetchCoinOptions();
     fetchCoinPriceList();
     fetchWallets();
-    fetchSpotOrders(); // Replace fetchOrders with fetchSpotOrders
+    fetchSpotOrders();
     fetchTradeHistory();
     _initializeOrderBookWebSocket();
     _timer = Timer.periodic(const Duration(seconds: 30), (timer) {
       fetchCoinPriceList();
       fetchWallets();
-      fetchSpotOrders(); // Update orders periodically
+      fetchSpotOrders();
       fetchTradeHistory();
     });
     _webViewController = WebViewController()
@@ -127,6 +132,9 @@ class _ChartScreenState extends State<ChartScreen>
           isCoinLoading = false;
           if (!coinOptions.contains(selectedCoin)) {
             selectedCoin = coinOptions.isNotEmpty ? coinOptions[0] : 'bitcoin';
+            _webViewController.loadHtmlString(
+              _getTradingViewHtml(selectedCoin),
+            );
           }
         });
       } else {
@@ -188,11 +196,11 @@ class _ChartScreenState extends State<ChartScreen>
     try {
       final token = await AuthManager().getAuthToken();
       final cryptoResponse = await http.get(
-        Uri.parse('$baseUrl/api/wallet/fetchCompleteCryptoDetails'),
+        Uri.parse('$BaseUrl/api/wallet/fetchCompleteCryptoDetails'),
         headers: {'Authorization': 'Bearer $token'},
       );
       final fiatResponse = await http.get(
-        Uri.parse('$baseUrl/api/wallet/balance'),
+        Uri.parse('$BaseUrl/api/wallet/balance'),
         headers: {'Authorization': 'Bearer $token'},
       );
 
@@ -210,9 +218,7 @@ class _ChartScreenState extends State<ChartScreen>
                 w['coinName'] == targetCoinbase ||
                 w['coinName'].split('_')[0].toUpperCase() ==
                     targetCoinbase.split('-')[0],
-            orElse: () => cryptoData.isNotEmpty
-                ? cryptoData[0]
-                : {'balance': 0.0, '_id': null},
+            orElse: () => {'balance': 0.0, '_id': null},
           );
           cryptoWalletId = wallet['_id']?.toString();
           cryptoBalance = wallet['balance']?.toDouble() ?? 0.0;
@@ -224,71 +230,99 @@ class _ChartScreenState extends State<ChartScreen>
           fiatWalletId = fiatWallet['_id']?.toString();
           fiatBalance = fiatWallet['balance']?.toDouble() ?? 0.0;
         });
+      } else {
+        print(
+          'Failed to fetch wallets: Crypto ${cryptoResponse.statusCode}, Fiat ${fiatResponse.statusCode}',
+        );
       }
     } catch (e) {
       print('Error fetching wallets: $e');
     }
   }
 
-  Future<List<OrderData>> fetchSpotOrders() async {
+  Future<void> fetchSpotOrders() async {
+    setState(() {
+      isOrdersLoading = true;
+      ordersErrorMessage = null;
+    });
     try {
-      final token = await AuthManager().getAuthToken();
-      final response = await http.get(
-        Uri.parse('$baseUrl/api/wallet/fetchSpotOrders'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final jsonResponse = jsonDecode(response.body);
-        final List<dynamic> data = jsonResponse['data'];
-        return data
-            .map((json) => OrderData.fromJson(json))
-            .toList(); // Returns List<OrderData>
-      } else if (response.statusCode == 404) {
-        return [];
-      } else {
-        throw Exception('Failed to fetch spot orders: ${response.body}');
-      }
+      final orders = await _apiService.fetchSpotOrders();
+      print('Raw orders from API: $orders');
+      setState(() {
+        userOrders = orders
+            .map(
+              (order) => {
+                'side': order.side,
+                'orderType': order.orderType,
+                'price': order.price,
+                'amount': order.amount,
+                'status': order.status,
+                'createdAt': order.createdAt,
+              },
+            )
+            .toList();
+        isOrdersLoading = false;
+        print('Parsed userOrders: $userOrders');
+        if (userOrders.isEmpty) {
+          print('No orders found for user');
+        }
+      });
     } catch (e) {
-      throw Exception('Error fetching spot orders: $e');
+      print('Error fetching spot orders: $e');
+      setState(() {
+        userOrders = [];
+        isOrdersLoading = false;
+        ordersErrorMessage = 'Failed to load orders: $e';
+      });
     }
   }
 
   Future<void> fetchTradeHistory() async {
+    setState(() {
+      isTradeHistoryLoading = true;
+      tradeHistoryErrorMessage = null;
+    });
     try {
       final token = await AuthManager().getAuthToken();
       final response = await http.get(
-        Uri.parse('$baseUrl/api/wallet/transactions'),
+        Uri.parse('$BaseUrl/api/wallet/transactions'),
         headers: {'Authorization': 'Bearer $token'},
       );
+      print(
+        'Trade History Response: ${response.statusCode} ${response.body}',
+      ); // Debug
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as List<dynamic>;
+        final coinbasePair =
+            coinSymbolMap[selectedCoin]?['coinbase'] ?? 'BTC-USD';
+        print('Filtering tradeHistory for coin: $coinbasePair'); // Debug
         setState(() {
-          tradeHistory = data
-              .where(
-                (tx) =>
-                    tx['currency'] == coinSymbolMap[selectedCoin]?['coinbase'],
-              )
-              .map((tx) {
-                final fiatAmount = tx['fiatAmount'] as num? ?? 0;
-                final amount = tx['amount'] as num? ?? 1;
-                return {
-                  'time': DateTime.parse(tx['createdAt'] as String),
-                  'price': fiatAmount / amount,
-                  'amount': amount,
-                  'type': tx['type'] as String? ?? 'Unknown',
-                };
-              })
-              .toList();
+          tradeHistory = data.where((tx) => tx['currency'] == coinbasePair).map(
+            (tx) {
+              final fiatAmount = tx['fiatAmount'] as num? ?? 0;
+              final amount = tx['amount'] as num? ?? 1;
+              return {
+                'time': DateTime.parse(tx['createdAt'] as String),
+                'price': fiatAmount / amount,
+                'amount': amount,
+                'type': tx['type'] as String? ?? 'Unknown',
+              };
+            },
+          ).toList();
+          isTradeHistoryLoading = false;
+          print('Fetched tradeHistory: $tradeHistory'); // Debug
         });
+      } else {
+        throw Exception(
+          'Failed to fetch trade history: ${response.statusCode}',
+        );
       }
     } catch (e) {
       print('Error fetching trade history: $e');
       setState(() {
         tradeHistory = [];
+        isTradeHistoryLoading = false;
+        tradeHistoryErrorMessage = 'Failed to load trade history: $e';
       });
     }
   }
@@ -418,7 +452,7 @@ class _ChartScreenState extends State<ChartScreen>
 
       final token = await AuthManager().getAuthToken();
       final response = await http.post(
-        Uri.parse('$baseUrl/api/wallet/placeOrder'),
+        Uri.parse('$BaseUrl/api/wallet/placeOrder'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -437,17 +471,13 @@ class _ChartScreenState extends State<ChartScreen>
 
       if (response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '${orderType ?? 'Market'} $side order placed successfully',
-            ),
-          ),
+          SnackBar(content: Text('$orderType $side order placed successfully')),
         );
         amountController.clear();
         priceController.clear();
         stopPriceController.clear();
         await fetchWallets();
-        await fetchSpotOrders(); // Refresh orders after placing a new one
+        await fetchSpotOrders();
         await fetchTradeHistory();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -468,38 +498,41 @@ class _ChartScreenState extends State<ChartScreen>
 
   String _getTradingViewHtml(String coinId) {
     final symbol = coinSymbolMap[coinId]?['tradingview'] ?? 'BTCUSD';
-    return '''
+    final html =
+        '''
       <!DOCTYPE html>
       <html>
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <script src="https://s3.tradingview.com/tv.js"></script>
-      </head>
-      <body style="margin:0;padding:0;overflow:hidden;">
-        <div id="tradingview_chart" style="width:100%;height:100vh;position:absolute;top:0;left:0;"></div>
-        <script type="text/javascript">
-          new TradingView.widget({
-            "container_id": "tradingview_chart",
-            "width": "100%",
-            "height": "100%",
-            "symbol": "COINBASE:$symbol",
-            "interval": "60",
-            "timezone": "Etc/UTC",
-            "theme": "dark",
-            "style": "10",
-            "locale": "en",
-            "toolbar_bg": "#f1f3f6",
-            "enable_publishing": false,
-            "allow_symbol_change": false,
-            "studies": ["STD;Volume"],
-            "show_popup_button": true,
-            "popup_width": "1000",
-            "popup_height": "650"
-          });
-        </script>
-      </body>
+        <head>
+          <meta name="viewport" content="width=device-width,initial-scale=1.0">
+          <script src="https://s3.tradingview.com/tv.js"></script>
+        </head>
+        <body style="margin:0;padding:0;overflow:hidden">
+          <div id="tradingview_chart" style="width:100%;height:100vh;position:absolute;top:0;left:0"></div>
+          <script>
+            new TradingView.widget({
+              "container_id": "tradingview_chart",
+              "width": "100%",
+              "height": "100%",
+              "symbol": "COINBASE:$symbol",
+              "interval": "1",
+              "timezone": "Etc/UTC",
+              "theme": "dark",
+              "style": "10",
+              "locale": "en",
+              "toolbar_bg": "#f1f3f6",
+              "enable_publishing": false,
+              "allow_symbol_change": false,
+              "studies": ["STD;Volume"],
+              "show_popup_button": true,
+              "popup_width": "1000",
+              "popup_height": "650"
+            });
+          </script>
+        </body>
       </html>
     ''';
+    print('Generated HTML for $coinId: $symbol'); // Debug
+    return html;
   }
 
   @override
@@ -510,11 +543,9 @@ class _ChartScreenState extends State<ChartScreen>
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        leading: InkWell(
-          onTap: () {
-            Navigator.pop(context);
-          },
-          child: Icon(Icons.arrow_back, color: Colors.white),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.push(context, CupertinoPageRoute(builder: (context) => MainScreen(),)),
         ),
         backgroundColor: Colors.black,
         title: Text(
@@ -539,9 +570,11 @@ class _ChartScreenState extends State<ChartScreen>
                         selectedCoin = newValue;
                         isLoading = true;
                         chartErrorMessage = null;
+                        ordersErrorMessage = null;
+                        tradeHistoryErrorMessage = null;
                         fetchCoinPriceList();
                         fetchWallets();
-                        fetchSpotOrders(); // Refresh orders when coin changes
+                        fetchSpotOrders();
                         fetchTradeHistory();
                         _initializeOrderBookWebSocket();
                         _webViewController.loadHtmlString(
@@ -550,22 +583,22 @@ class _ChartScreenState extends State<ChartScreen>
                       });
                     }
                   },
-                  items: coinOptions.map<DropdownMenuItem<String>>((
-                    String value,
-                  ) {
-                    return DropdownMenuItem<String>(
-                      value: value,
-                      child: Text(
-                        value.toUpperCase(),
-                        style: const TextStyle(color: Colors.white),
-                      ),
-                    );
-                  }).toList(),
+                  items: coinOptions
+                      .map<DropdownMenuItem<String>>(
+                        (String value) => DropdownMenuItem<String>(
+                          value: value,
+                          child: Text(
+                            value.toUpperCase(),
+                            style: const TextStyle(color: Colors.white),
+                          ),
+                        ),
+                      )
+                      .toList(),
                 ),
-          IconButton(
-            icon: const Icon(Icons.camera_alt, color: Colors.white),
-            onPressed: () {},
-          ),
+          // IconButton(
+          //   icon: const Icon(Icons.camera_alt, color: Colors.white),
+          //   onPressed: () {},
+          // ),
         ],
       ),
       body: isLoading
@@ -642,16 +675,16 @@ class _ChartScreenState extends State<ChartScreen>
                     Tab(text: 'Chart'),
                     Tab(text: 'Price List'),
                     Tab(text: 'Trade'),
-                    Tab(text: 'Order Book'),
-                    Tab(text: 'Trade History'),
                     Tab(text: 'My Orders'),
+                    Tab(text: 'Trade History'),
+                    Tab(text: 'Order Book'),
                   ],
                 ),
                 Expanded(
                   child: TabBarView(
                     controller: _tabController,
                     children: [
-                      Expanded(
+                      SizedBox.expand(
                         child: WebViewWidget(controller: _webViewController),
                       ),
                       ListView.builder(
@@ -664,9 +697,11 @@ class _ChartScreenState extends State<ChartScreen>
                                 selectedCoin = coin['id'];
                                 isLoading = true;
                                 chartErrorMessage = null;
+                                ordersErrorMessage = null;
+                                tradeHistoryErrorMessage = null;
                                 fetchCoinPriceList();
                                 fetchWallets();
-                                fetchSpotOrders(); // Refresh orders when coin changes
+                                fetchSpotOrders();
                                 fetchTradeHistory();
                                 _initializeOrderBookWebSocket();
                                 _webViewController.loadHtmlString(
@@ -722,7 +757,7 @@ class _ChartScreenState extends State<ChartScreen>
                                     style: const TextStyle(color: Colors.white),
                                     decoration: InputDecoration(
                                       labelText: isAmountInCrypto
-                                          ? 'Amount (${coinSymbolMap[selectedCoin]!['coinbase']!.split('-')[0]})'
+                                          ? 'Amount (${coinSymbolMap[selectedCoin]?['coinbase']?.split('-')[0] ?? 'BTC'})'
                                           : 'Amount (USD)',
                                       labelStyle: const TextStyle(
                                         color: Colors.white70,
@@ -882,138 +917,98 @@ class _ChartScreenState extends State<ChartScreen>
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    SizedBox(
-                                      width: isSmallScreen
-                                          ? screenWidth * 0.45
-                                          : 150,
-                                      child: ElevatedButton(
-                                        onPressed: () => placeOrder('Buy'),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.green,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              8,
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: ElevatedButton(
+                                          onPressed: () => placeOrder('Buy'),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.green,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 12,
                                             ),
                                           ),
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 12,
+                                          child: const Text(
+                                            'Buy / Long',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                            textAlign: TextAlign.center,
                                           ),
-                                        ),
-                                        child: const Text(
-                                          'Buy / Long',
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                          textAlign: TextAlign.center,
                                         ),
                                       ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Wrap(
-                                      spacing: 4.0,
-                                      runSpacing: 4.0,
-                                      children: [
-                                        _buildPercentageButton(25),
-                                        _buildPercentageButton(50),
-                                        _buildPercentageButton(75),
-                                        _buildPercentageButton(100),
-                                      ],
-                                    ),
-                                  ],
+                                      const SizedBox(height: 8),
+                                      Wrap(
+                                        spacing: 4.0,
+                                        runSpacing: 4.0,
+                                        children: [
+                                          _buildPercentageButton(25),
+                                          _buildPercentageButton(50),
+                                          _buildPercentageButton(75),
+                                          _buildPercentageButton(100),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    SizedBox(
-                                      width: isSmallScreen
-                                          ? screenWidth * 0.45
-                                          : 150,
-                                      child: ElevatedButton(
-                                        onPressed: () => placeOrder('Sell'),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.red,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              8,
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: ElevatedButton(
+                                          onPressed: () => placeOrder('Sell'),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.red,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 12,
                                             ),
                                           ),
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 12,
+                                          child: const Text(
+                                            'Sell / Short',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                            textAlign: TextAlign.center,
                                           ),
-                                        ),
-                                        child: const Text(
-                                          'Sell / Short',
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                          textAlign: TextAlign.center,
                                         ),
                                       ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Wrap(
-                                      spacing: 4.0,
-                                      runSpacing: 4.0,
-                                      children: [
-                                        _buildPercentageButton(25),
-                                        _buildPercentageButton(50),
-                                        _buildPercentageButton(75),
-                                        _buildPercentageButton(100),
-                                      ],
-                                    ),
-                                  ],
+                                      const SizedBox(height: 8),
+                                      Wrap(
+                                        spacing: 4.0,
+                                        runSpacing: 4.0,
+                                        children: [
+                                          _buildPercentageButton(25),
+                                          _buildPercentageButton(50),
+                                          _buildPercentageButton(75),
+                                          _buildPercentageButton(100),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ],
                             ),
                           ],
                         ),
-                      ),
-                      ListView.builder(
-                        itemCount: orderBook.length,
-                        itemBuilder: (context, index) {
-                          final order = orderBook[index];
-                          return ListTile(
-                            title: Text(
-                              '\$${order['price'].toStringAsFixed(2)}',
-                              style: TextStyle(
-                                color: order['type'] == 'buy'
-                                    ? Colors.green
-                                    : Colors.red,
-                              ),
-                            ),
-                            subtitle: Text(
-                              'Amount: ${order['amount'].toStringAsFixed(2)}',
-                              style: const TextStyle(color: Colors.white70),
-                            ),
-                          );
-                        },
-                      ),
-                      ListView.builder(
-                        itemCount: tradeHistory.length,
-                        itemBuilder: (context, index) {
-                          final trade = tradeHistory[index];
-                          return ListTile(
-                            title: Text(
-                              '\$${trade['price'].toStringAsFixed(2)}',
-                              style: TextStyle(
-                                color: trade['type'] == 'buy'
-                                    ? Colors.green
-                                    : Colors.red,
-                              ),
-                            ),
-                            subtitle: Text(
-                              'Amount: ${trade['amount'].toStringAsFixed(2)} • ${DateFormat('HH:mm').format(trade['time'])}',
-                              style: const TextStyle(color: Colors.white70),
-                            ),
-                          );
-                        },
                       ),
                       ListView.builder(
                         itemCount: userOrders.length,
@@ -1033,12 +1028,120 @@ class _ChartScreenState extends State<ChartScreen>
                               style: const TextStyle(color: Colors.white70),
                             ),
                             trailing: Text(
-                              DateFormat('HH:mm').format(order['createdAt']),
+                              DateFormat(
+                                'HH:mm',
+                              ).format(order['createdAt'] as DateTime),
                               style: const TextStyle(color: Colors.white70),
                             ),
                           );
                         },
                       ),
+                      isTradeHistoryLoading
+                          ? const Center(
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                              ),
+                            )
+                          : tradeHistoryErrorMessage != null
+                          ? Center(
+                              child: Text(
+                                tradeHistoryErrorMessage!,
+                                style: const TextStyle(
+                                  color: Colors.red,
+                                  fontSize: 14,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            )
+                          : tradeHistory.isEmpty
+                          ? const Center(
+                              child: Text(
+                                'No trade history available',
+                                style: TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            )
+                          : ListView.builder(
+                              itemCount: tradeHistory.length,
+                              itemBuilder: (context, index) {
+                                final trade = tradeHistory[index];
+                                return ListTile(
+                                  title: Text(
+                                    '\$${trade['price'].toStringAsFixed(2)}',
+                                    style: TextStyle(
+                                      color: trade['type'] == 'buy'
+                                          ? Colors.green
+                                          : Colors.red,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    'Amount: ${trade['amount'].toStringAsFixed(2)} • ${DateFormat('HH:mm').format(trade['time'] as DateTime)}',
+                                    style: const TextStyle(
+                                      color: Colors.white70,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                      isOrdersLoading
+                          ? const Center(
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                              ),
+                            )
+                          : ordersErrorMessage != null
+                          ? Center(
+                              child: Text(
+                                ordersErrorMessage!,
+                                style: const TextStyle(
+                                  color: Colors.red,
+                                  fontSize: 14,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            )
+                          : userOrders.isEmpty
+                          ? const Center(
+                              child: Text(
+                                'No orders available',
+                                style: TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            )
+                          : ListView.builder(
+                              itemCount: userOrders.length,
+                              itemBuilder: (context, index) {
+                                final order = userOrders[index];
+                                return ListTile(
+                                  title: Text(
+                                    '${order['side']} ${order['orderType']} \$${order['price']?.toStringAsFixed(2) ?? 'Market'}',
+                                    style: TextStyle(
+                                      color: order['side'] == 'Buy'
+                                          ? Colors.green
+                                          : Colors.red,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    'Amount: ${order['amount'].toStringAsFixed(2)} • Status: ${order['status']}',
+                                    style: const TextStyle(
+                                      color: Colors.white70,
+                                    ),
+                                  ),
+                                  trailing: Text(
+                                    DateFormat(
+                                      'HH:mm',
+                                    ).format(order['createdAt'] as DateTime),
+                                    style: const TextStyle(
+                                      color: Colors.white70,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
                     ],
                   ),
                 ),
@@ -1051,9 +1154,7 @@ class _ChartScreenState extends State<ChartScreen>
     return SizedBox(
       width: MediaQuery.of(context).size.width / 3.5,
       child: ElevatedButton(
-        onPressed: () {
-          setState(() => orderType = type);
-        },
+        onPressed: () => setState(() => orderType = type),
         style: ElevatedButton.styleFrom(
           backgroundColor: orderType == type ? Colors.white : Colors.black26,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),

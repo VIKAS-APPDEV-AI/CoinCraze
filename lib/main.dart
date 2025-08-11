@@ -1,41 +1,41 @@
 import 'package:coincraze/AuthManager.dart';
-import 'package:coincraze/BankDetailsScreen.dart';
-import 'package:coincraze/BottomBar.dart';
-import 'package:coincraze/CoinSwap.dart';
-import 'package:coincraze/ForgotPassword.dart';
-import 'package:coincraze/HomeScreen.dart';
+import 'package:coincraze/BottomBar.dart'; // Assuming this is your MainScreen
 import 'package:coincraze/LoginScreen.dart';
 import 'package:coincraze/OnboardingScreen.dart';
-import 'package:coincraze/OtpValidationScreen.dart';
-import 'package:coincraze/ProfilePage.dart';
-import 'package:coincraze/Screens/FiatWalletScreen.dart';
-import 'package:coincraze/Screens/SellCryptoScreen.dart';
-import 'package:coincraze/SplashScreen.dart';
-import 'package:coincraze/UpdatePassword.dart';
-import 'package:coincraze/VerifyOtp.dart';
-import 'package:coincraze/WalletList.dart';
-import 'package:coincraze/demoColor.dart';
-import 'package:coincraze/kyc.dart';
-import 'package:coincraze/newKyc.dart';
-import 'package:coincraze/walletScreen.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hive/hive.dart';
-import 'package:hive_flutter/adapters.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Hive.initFlutter(); // Initialize Hive
-  await Hive.openBox('userBox'); // Open the box
-  print('Hive box "userBox" opened successfully');
-  await AuthManager().init();
-  runApp(const MyApp());
+  var userBox = await Hive.openBox('userBox');
+
+  await AuthManager().init(); // Load login state
+
+  // Determine which screen to show first
+  bool isFirstLaunch = userBox.get('isFirstLaunch', defaultValue: true);
+  bool isLoggedIn = AuthManager().isLoggedIn;
+
+  Widget initialScreen;
+
+  if (isFirstLaunch) {
+    await userBox.put('isFirstLaunch', false);
+    initialScreen = OnboardingScreen();
+  } else if (!isLoggedIn) {
+    initialScreen = LoginScreen();
+  } else {
+    initialScreen = MainScreen(); // This is your main/home screen
+  }
+
+  runApp(MyApp(initialScreen: initialScreen));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final Widget initialScreen;
+  const MyApp({super.key, required this.initialScreen});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -45,7 +45,7 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         textTheme: GoogleFonts.poppinsTextTheme(Theme.of(context).textTheme),
       ),
-      home: MainScreen(),
+      home: initialScreen,
     );
   }
 }

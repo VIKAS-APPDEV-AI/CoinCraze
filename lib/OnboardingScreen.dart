@@ -1,4 +1,6 @@
 import 'package:coincraze/LoginScreen.dart';
+import 'package:coincraze/ProfilePage.dart';
+import 'package:coincraze/Screens/SettingsPage.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
@@ -67,14 +69,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> with SingleTickerPr
         curve: Curves.easeInOut,
       );
     } else {
-   
-     Navigator.pushReplacement(context, CupertinoPageRoute(builder: (context) => LoginScreen(),));
+      Navigator.pushReplacement(context, CupertinoPageRoute(builder: (context) => LoginScreen()));
     }
   }
 
   void _skipToEnd() {
     _pageController.jumpToPage(_pages.length - 1);
   }
+
+  // void _navigateToSettings() {
+  //   Navigator.push(
+  //     context,
+  //     CupertinoPageRoute(builder: (context) => CryptoSettingsPage()),
+  //   );
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -94,6 +102,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> with SingleTickerPr
               ),
             ),
           ),
+          // Settings button at top left
+          // Positioned(
+          //   top: 40,
+          //   left: 16,
+          //   child: IconButton(
+          //     onPressed: _navigateToSettings,
+          //     icon: Icon(
+          //       Icons.settings,
+          //       color: Colors.black,
+          //       size: 28,
+          //     ),
+          //   ),
+          // ),
           // Skip button at top right
           Positioned(
             top: 40,
@@ -114,7 +135,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> with SingleTickerPr
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                SizedBox(height: 30,),
+                SizedBox(height: 30),
                 Image.asset(
                   'assets/images/NoBgLogo.png',
                   height: 250,

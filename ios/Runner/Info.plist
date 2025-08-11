@@ -4,6 +4,10 @@
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>NSCameraUsageDescription</key>
+    <string>This app needs camera access to scan QR codes</string>
+	<key>NSFaceIDUsageDescription</key>
+    <string>We need Face ID to secure your login.</string>
 	<key>CFBundleDisplayName</key>
 	<string>Coincraze</string>
 	<key>CFBundleExecutable</key>

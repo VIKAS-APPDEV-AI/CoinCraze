@@ -35,8 +35,8 @@ class _LoginScreenState extends State<LoginScreen>
     );
     _slideAnimation =
         Tween<Offset>(begin: const Offset(2, 0.4), end: Offset.zero).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.ease),
-    );
+          CurvedAnimation(parent: _animationController, curve: Curves.ease),
+        );
     _animationController.forward();
     _initAuthManager();
   }
@@ -99,9 +99,9 @@ class _LoginScreenState extends State<LoginScreen>
     }
 
     try {
-      print('Sending request to $baseUrl/api/auth/login');
+      print('Sending request to $BaseUrl/api/auth/login');
       final response = await http.post(
-        Uri.parse('$baseUrl/api/auth/login'),
+        Uri.parse('$BaseUrl/api/auth/login'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({'email': email, 'password': password}),
       );
@@ -204,6 +204,36 @@ class _LoginScreenState extends State<LoginScreen>
     });
   }
 
+  Future<void> _handleSocialLogin(String provider) async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // Implement social login logic here (e.g., using google_sign_in, firebase_auth, etc.)
+      // Example: await AuthManager().signInWithProvider(provider);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Logging in with $provider...'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      // Add navigation logic after successful login
+    } catch (e) {
+      print('Social login error: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: const Color(0xFFD1493B),
+        ),
+      );
+    }
+
+    setState(() {
+      _isLoading = false;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -212,19 +242,19 @@ class _LoginScreenState extends State<LoginScreen>
 
     return Scaffold(
       body: Container(
-        width: screenWidth, // Full screen width
-        height: screenHeight, // Full screen height
+        width: screenWidth,
+        height: screenHeight,
         decoration: BoxDecoration(
           image: DecorationImage(
             image: const AssetImage('assets/images/e.jpg'),
-            fit: BoxFit.cover, // Image covers entire screen
+            fit: BoxFit.cover,
             colorFilter: ColorFilter.mode(
-              Colors.black.withOpacity(0.5), // Original opacity
+              Colors.black.withOpacity(0.5),
               BlendMode.colorBurn,
             ),
           ),
           gradient: const LinearGradient(
-            colors: [Color.fromARGB(255, 3, 4, 4), Colors.white], // Original gradient
+            colors: [Color.fromARGB(255, 3, 4, 4), Colors.white],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
@@ -239,7 +269,7 @@ class _LoginScreenState extends State<LoginScreen>
                 ),
                 child: Column(
                   children: [
-                    SizedBox(height: screenHeight * 0.02), // Adjusted spacing
+                    SizedBox(height: screenHeight * 0.02),
                     SlideTransition(
                       position: _slideAnimation,
                       child: Image.asset(
@@ -264,7 +294,7 @@ class _LoginScreenState extends State<LoginScreen>
                     SlideTransition(
                       position: _slideAnimation,
                       child: Text(
-                        "Login with email and password or use fingerprint",
+                        "Login with email and password",
                         textAlign: TextAlign.center,
                         style: GoogleFonts.poppins(
                           fontSize: isTablet ? 16.0 : 14.0,
@@ -292,7 +322,9 @@ class _LoginScreenState extends State<LoginScreen>
                           filled: true,
                           fillColor: Colors.grey[100],
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(isTablet ? 18.0 : 15.0),
+                            borderRadius: BorderRadius.circular(
+                              isTablet ? 18.0 : 15.0,
+                            ),
                             borderSide: BorderSide.none,
                           ),
                         ),
@@ -327,7 +359,9 @@ class _LoginScreenState extends State<LoginScreen>
                           filled: true,
                           fillColor: Colors.grey[100],
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(isTablet ? 18.0 : 15.0),
+                            borderRadius: BorderRadius.circular(
+                              isTablet ? 18.0 : 15.0,
+                            ),
                             borderSide: BorderSide.none,
                           ),
                         ),
@@ -350,7 +384,7 @@ class _LoginScreenState extends State<LoginScreen>
                             'Forgot Password?',
                             style: GoogleFonts.poppins(
                               fontSize: isTablet ? 16.0 : 14.0,
-                              color:  Colors.white,
+                              color: Colors.white,
                             ),
                           ),
                         ),
@@ -370,15 +404,25 @@ class _LoginScreenState extends State<LoginScreen>
                                 ElevatedButton(
                                   onPressed: _handleLogin,
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color.fromARGB(255, 0, 0, 0),
+                                    backgroundColor: const Color.fromARGB(
+                                      255,
+                                      0,
+                                      0,
+                                      0,
+                                    ),
                                     padding: EdgeInsets.symmetric(
                                       horizontal: isTablet ? 40.0 : 32.0,
                                       vertical: isTablet ? 18.0 : 16.0,
                                     ),
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(isTablet ? 18.0 : 15.0),
+                                      borderRadius: BorderRadius.circular(
+                                        isTablet ? 18.0 : 15.0,
+                                      ),
                                     ),
-                                    minimumSize: Size(double.infinity, isTablet ? 55 : 50),
+                                    minimumSize: Size(
+                                      double.infinity,
+                                      isTablet ? 55 : 50,
+                                    ),
                                   ),
                                   child: Text(
                                     'Login',
@@ -390,43 +434,139 @@ class _LoginScreenState extends State<LoginScreen>
                                   ),
                                 ),
                                 SizedBox(height: screenHeight * 0.015),
-                                ElevatedButton(
-                                  onPressed: _handleBiometricLogin,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color.fromARGB(255, 0, 0, 0),
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: isTablet ? 40.0 : 32.0,
-                                      vertical: isTablet ? 18.0 : 16.0,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(isTablet ? 18.0 : 15.0),
-                                    ),
-                                    minimumSize: Size(double.infinity, isTablet ? 55 : 50),
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      const Icon(
-                                        Icons.fingerprint,
-                                        color: Colors.white,
-                                        size: 24,
-                                      ),
-                                      const SizedBox(width: 8.0),
-                                      Text(
-                                        'Login with Fingerprint',
-                                        style: GoogleFonts.poppins(
-                                          fontSize: isTablet ? 18.0 : 16.0,
-                                          fontWeight: FontWeight.w600,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                                // ElevatedButton(
+                                //   onPressed: _handleBiometricLogin,
+                                //   style: ElevatedButton.styleFrom(
+                                //     backgroundColor: const Color.fromARGB(
+                                //       255,
+                                //       0,
+                                //       0,
+                                //       0,
+                                //     ),
+                                //     padding: EdgeInsets.symmetric(
+                                //       horizontal: isTablet ? 40.0 : 32.0,
+                                //       vertical: isTablet ? 18.0 : 16.0,
+                                //     ),
+                                //     shape: RoundedRectangleBorder(
+                                //       borderRadius: BorderRadius.circular(
+                                //         isTablet ? 18.0 : 15.0,
+                                //       ),
+                                //     ),
+                                //     minimumSize: Size(
+                                //       double.infinity,
+                                //       isTablet ? 55 : 50,
+                                //     ),
+                                //   ),
+                                //   child: Row(
+                                //     mainAxisAlignment: MainAxisAlignment.center,
+                                //     children: [
+                                //       const Icon(
+                                //         Icons.fingerprint,
+                                //         color: Colors.white,
+                                //         size: 24,
+                                //       ),
+                                //       const SizedBox(width: 8.0),
+                                //       Text(
+                                //         'Login with Fingerprint',
+                                //         style: GoogleFonts.poppins(
+                                //           fontSize: isTablet ? 18.0 : 16.0,
+                                //           fontWeight: FontWeight.w600,
+                                //           color: Colors.white,
+                                //         ),
+                                //       ),
+                                //     ],
+                                //   ),
+                                // ),
                               ],
                             ),
                     ),
-                    SizedBox(height: screenHeight * 0.04),
+                  // SizedBox(height: screenHeight * 0.02),
+                    // SlideTransition(
+                    //   position: _slideAnimation,
+                    //   child: Row(
+                    //     mainAxisAlignment: MainAxisAlignment.center,
+                    //     children: [
+                    //       Divider(color: Colors.blue,),
+                    //       Text(
+                    //         '-----------  OR LOGIN WITH  ----------',
+                    //         style: GoogleFonts.poppins(
+                    //           fontSize: isTablet ? 16.0 : 14.0,
+                    //           color: Colors.grey[400],
+                    //         ),
+                    //       ),
+                    //       Divider(color: Colors.blue,),
+                    //     ],
+                    //   ),
+                    // ),
+                    // SizedBox(height: screenHeight * 0.015),
+                    // Container(
+                    //   decoration: BoxDecoration(
+                    //     color: Colors.white.withOpacity(
+                    //       0.3,
+                    //     ), 
+                    //     borderRadius: BorderRadius.circular(20)// Semi-transparent white background
+                    //   ),
+                    //   child: Padding(
+                    //     padding: const EdgeInsets.all(5.0),
+                    //     child: Row(
+                    //       mainAxisAlignment: MainAxisAlignment.center,
+                    //       children: [
+                    //         SlideTransition(
+                    //           position: _slideAnimation,
+                    //           child: Row(
+                    //             mainAxisAlignment: MainAxisAlignment.center,
+                    //             children: [
+                    //               ElevatedButton(
+                    //                 onPressed: () => _handleSocialLogin('apple'),
+                    //                 style: ElevatedButton.styleFrom(
+                    //                   backgroundColor: Colors.black,
+                    //                   shape: const CircleBorder(),
+                    //                   padding: const EdgeInsets.all(12),
+                    //                 ),
+                    //                 child: const Icon(
+                    //                   Icons.apple,
+                    //                   color: Colors.white,
+                    //                   size: 18,
+                    //                 ),
+                    //               ),
+                    //               SizedBox(width: screenWidth * 0.04),
+                    //               ElevatedButton(
+                    //                 onPressed: () => _handleSocialLogin('google'),
+                    //                 style: ElevatedButton.styleFrom(
+                    //                   backgroundColor: Colors.white,
+                    //                   shape: const CircleBorder(),
+                    //                   padding: const EdgeInsets.all(12),
+                    //                 ),
+                    //                 child: Image.asset(
+                    //                   'assets/images/google_logo.png', // Add Google icon asset
+                    //                   width: 18,
+                    //                   height: 18,
+                    //                 ),
+                    //               ),
+                    //               SizedBox(width: screenWidth * 0.04),
+                    //               ElevatedButton(
+                    //                 onPressed: () =>
+                    //                     _handleSocialLogin('facebook'),
+                    //                 style: ElevatedButton.styleFrom(
+                    //                   backgroundColor: const Color(0xFF1877F2),
+                    //                   shape: const CircleBorder(),
+                    //                   padding: const EdgeInsets.all(12),
+                    //                 ),
+                    //                 child: const Icon(
+                    //                   Icons.facebook,
+                    //                   color: Colors.white,
+                    //                   size: 18,
+                    //                 ),
+                    //               ),
+                    //             ],
+                    //           ),
+                    //         ),
+                    //       ],
+                    //     ),
+                    //   ),
+                    // ),
+
+                    SizedBox(height: screenHeight * 0.01),
                     SlideTransition(
                       position: _slideAnimation,
                       child: Row(
@@ -436,7 +576,7 @@ class _LoginScreenState extends State<LoginScreen>
                             "Don't have an account? ",
                             style: GoogleFonts.poppins(
                               fontSize: isTablet ? 16.0 : 14.0,
-                              color: Colors.grey[600],
+                              color: const Color.fromARGB(255, 228, 221, 221),
                             ),
                           ),
                           GestureDetector(
@@ -449,11 +589,11 @@ class _LoginScreenState extends State<LoginScreen>
                               );
                             },
                             child: Text(
-                              'Sign Up',
+                              ' Sign Up',
                               style: GoogleFonts.poppins(
-                                fontSize: isTablet ? 16.0 : 14.0,
+                                fontSize: isTablet ? 16.0 : 16.0,
                                 color: const Color.fromARGB(255, 250, 249, 249),
-                                fontWeight: FontWeight.w600,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
                           ),

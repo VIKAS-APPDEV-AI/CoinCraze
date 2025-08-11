@@ -15,28 +15,28 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "com.example.coincraze"
+    namespace = "com.itio.coincraze"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = "27.0.12077973"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+        isCoreLibraryDesugaringEnabled = true // ✅ This is required for desugaring
     }
 
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
+        jvmTarget = "11"
     }
 
     defaultConfig {
-        applicationId = "com.example.coincraze"
+        applicationId = "com.itio.coincraze"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
-    // ✅ Signing configs defined directly inside android block (not inside buildTypes!)
     signingConfigs {
         create("release") {
             storeFile = file(keystoreProperties["storeFile"] as String)
@@ -47,7 +47,7 @@ android {
     }
 
     buildTypes {
-        release {
+        getByName("release") {
             signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
             isShrinkResources = false
@@ -57,4 +57,9 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // ✅ Add this line to enable Java 8+ features like java.time
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 }

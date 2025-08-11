@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:coincraze/AuthManager.dart';
 import 'package:coincraze/Constants/API.dart';
 import 'package:coincraze/Models/CryptoWallet.dart';
+import 'package:coincraze/Models/NotificationsModel.dart';
 import 'package:coincraze/Models/SpotOrderMode.dart';
 import 'package:coincraze/Models/Transactions.dart';
 import 'package:coincraze/Models/Wallet.dart';
@@ -12,7 +14,7 @@ class ApiService {
   // Replace with your NewsAPI key (store securely in production)
   static const String _newsApiKey =
       '6c41a5cc7ebe4221a238471104f4a5b5'; // Get from newsapi.org
-  static const String _baseUrl = 'https://newsapi.org/v2';
+  static const String _ProductionBaseUrl = 'https://newsapi.org/v2';
   final authToken = AuthManager().getAuthToken().toString();
 
   // New method for Tatum integration
@@ -25,23 +27,45 @@ class ApiService {
         throw Exception('No auth token found. Please log in.');
       }
 
+      final requestBody = jsonEncode({'coinName': coinName});
+      print('Request URL: $BaseUrl/api/wallet/createCryptoWallet');
+      print('Request Body: $requestBody');
+      print('Request Headers: Content-Type: application/json, Authorization: Bearer $authToken');
+      
       final response = await http.post(
-        Uri.parse('$baseUrl/api/wallet/createCryptoWallet'),
+        Uri.parse('$BaseUrl/api/wallet/createCryptoWallet'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $authToken',
         },
-        body: jsonEncode({'coinName': coinName}),
+        body: requestBody,
       );
 
+      print('Create Wallet Response Status: ${response.statusCode}');
       print('Create Wallet Response: ${response.body}');
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         try {
           final jsonResponse = jsonDecode(response.body);
+          print('Parsed JSON Response: $jsonResponse');
+          
+          // Check if response contains an error even with 200 status
+          if (jsonResponse.containsKey('error')) {
+            throw Exception('Server error: ${jsonResponse['error']}');
+          }
+          
+          // Check for success status in response
+          if (jsonResponse.containsKey('status') && jsonResponse['status'] != 200) {
+            final errorMsg = jsonResponse['message'] ?? jsonResponse['error'] ?? 'Unknown error';
+            throw Exception('Server error: $errorMsg');
+          }
+          
           final data = jsonResponse['data'] ?? jsonResponse;
           return CryptoWallet.fromJson(data);
         } catch (e) {
+          if (e.toString().contains('Server error:')) {
+            rethrow; // Re-throw server errors
+          }
           // Fallback if response is a string (wallet address)
           print('Parsing as string: ${response.body}');
           return CryptoWallet(
@@ -54,7 +78,20 @@ class ApiService {
           );
         }
       } else {
-        throw Exception('Failed to create wallet: ${response.statusCode}');
+        // Try to parse error message from response body
+        String errorMessage = 'Failed to create wallet: ${response.statusCode}';
+        try {
+          final errorResponse = jsonDecode(response.body);
+          if (errorResponse.containsKey('error')) {
+            errorMessage = 'Server error: ${errorResponse['error']}';
+          } else if (errorResponse.containsKey('message')) {
+            errorMessage = 'Server error: ${errorResponse['message']}';
+          }
+        } catch (e) {
+          // If we can't parse the error response, use the raw body
+          errorMessage = 'Server error: ${response.body}';
+        }
+        throw Exception(errorMessage);
       }
     } catch (e) {
       print('Error in createWalletAddress: $e');
@@ -67,58 +104,185 @@ class ApiService {
     String fiat,
     double amount,
   ) async {
-    final fromCurrency = fiat.toLowerCase(); // Use fiat as 'from' currency
-    final toCurrency = crypto.toLowerCase(); // Use crypto as 'to' currency
-    final url = Uri.parse(
-      '$baseUrl/api/wallet/convert?from=$fromCurrency&to=$toCurrency&amount=$amount',
-    );
-    print('Fetching exchange rate from: $url'); // Debug full URL
-    final response = await http.get(url);
-    print(
-      'API Response status: ${response.statusCode}, body: ${response.body}',
-    ); // Debug response
+    try {
+      // Input validation
+      if (amount <= 0) {
+        throw Exception('Amount must be greater than 0');
+      }
+      
+      if (amount > 1000000) {
+        throw Exception('Amount too large. Maximum allowed: 1,000,000');
+      }
 
-    if (response.statusCode == 200) {
-      final jsonData = jsonDecode(response.body);
-      if (jsonData.isEmpty || !jsonData.containsKey('rate')) {
-        print(
-          'Empty or invalid response for $fromCurrency to $toCurrency with amount $amount',
-        );
-        throw Exception('No exchange rate data available');
+      final fromCurrency = fiat.toLowerCase();
+      final toCurrency = crypto.toLowerCase();
+      
+      // Format amount to avoid scientific notation for large numbers
+      final formattedAmount = amount.toStringAsFixed(2);
+      
+      final url = Uri.parse(
+        '$BaseUrl/api/wallet/convert?from=$fromCurrency&to=$toCurrency&amount=$formattedAmount',
+      );
+      
+      print('Fetching exchange rate from: $url');
+      
+      // Add timeout to prevent hanging requests
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('Request timeout. Please try again.');
+        },
+      );
+      
+      print('API Response status: ${response.statusCode}, body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final jsonData = jsonDecode(response.body);
+        
+        if (jsonData == null || jsonData.isEmpty) {
+          throw Exception('Empty response from server');
+        }
+        
+        if (!jsonData.containsKey('rate')) {
+          print('Response missing rate field: $jsonData');
+          throw Exception('Invalid response format');
+        }
+        
+        final rateValue = jsonData['rate'];
+        if (rateValue == null) {
+          throw Exception('Rate value is null');
+        }
+        
+        final rate = (rateValue as num).toDouble();
+        
+        if (rate <= 0 || rate.isNaN || rate.isInfinite) {
+          print('Invalid rate value: $rate');
+          throw Exception('Invalid exchange rate received');
+        }
+        
+        print('Successfully fetched rate: $rate for $fromCurrency to $toCurrency');
+        return {fromCurrency: rate};
+        
+      } else if (response.statusCode == 400) {
+        final errorData = jsonDecode(response.body);
+        final errorMessage = errorData['error'] ?? 'Bad request';
+        throw Exception('Invalid request: $errorMessage');
+        
+      } else if (response.statusCode == 500) {
+        throw Exception('Server error. The amount might be too large or the conversion is not supported.');
+        
+      } else if (response.statusCode == 429) {
+        throw Exception('Too many requests. Please wait a moment and try again.');
+        
+      } else {
+        final errorBody = response.body.isNotEmpty ? response.body : 'Unknown error';
+        throw Exception('API error (${response.statusCode}): $errorBody');
       }
-      final rate = (jsonData['rate'] as num)
-          .toDouble(); // Extract rate directly
-      if (rate <= 0) {
-        print('Invalid rate value: $rate for $fromCurrency to $toCurrency');
-        throw Exception('Invalid exchange rate');
+      
+    } on FormatException catch (e) {
+      print('JSON parsing error: $e');
+      throw Exception('Invalid response format from server');
+      
+    } on TimeoutException catch (e) {
+      print('Timeout error: $e');
+      throw Exception('Request timeout. Please check your connection.');
+      
+    } catch (e) {
+      print('Exchange rate fetch error: $e');
+      if (e.toString().contains('SocketException') || 
+          e.toString().contains('NetworkException')) {
+        throw Exception('Network error. Please check your internet connection.');
       }
-      print(
-        'Fetched rate: $rate for $fromCurrency to $toCurrency (1 $toCurrency = $rate $fromCurrency)',
-      );
-      return {fromCurrency: rate}; // Return as {fiat: rate} map
-    } else {
-      print(
-        'API error, status: ${response.statusCode}, body: ${response.body}',
-      );
-      throw Exception(
-        'Failed to fetch exchange rate, status: ${response.statusCode}',
-      );
+      rethrow;
     }
   }
+
+  Future<Map<String, dynamic>> buyCrypto({
+  required String userId,
+  required String cryptoWalletId,
+  required String fiatWalletId,
+  required String cryptoCurrency,
+  required String fiatCurrency,
+  required double cryptoAmount,
+  required double fiatAmount,
+}) async {
+  try {
+    final token = await AuthManager().getAuthToken();
+    if (token == null) {
+      throw Exception('No auth token found. Please log in.');
+    }
+
+    final response = await http.post(
+      Uri.parse('$BaseUrl/api/wallet/buyCrypto'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({
+        'userId': userId,
+        'cryptoWalletId': cryptoWalletId,
+        'fiatWalletId': fiatWalletId,
+        'cryptoCurrency': cryptoCurrency,
+        'fiatCurrency': fiatCurrency,
+        'cryptoAmount': cryptoAmount,
+        'fiatAmount': fiatAmount,
+      }),
+    );
+
+    print('Buy Crypto Request URL: $BaseUrl/api/wallet/buyCrypto');
+    print('Buy Crypto Request Body: ${jsonEncode({
+      'userId': userId,
+      'cryptoWalletId': cryptoWalletId,
+      'fiatWalletId': fiatWalletId,
+      'cryptoCurrency': cryptoCurrency,
+      'fiatCurrency': fiatCurrency,
+      'cryptoAmount': cryptoAmount,
+      'fiatAmount': fiatAmount,
+    })}');
+    print('Buy Crypto Response Status: ${response.statusCode}');
+    print('Buy Crypto Response Body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final responseBody = jsonDecode(response.body);
+      print('Parsed Buy Crypto Response: $responseBody');
+      if (responseBody['status'] == 200) {
+        return responseBody; // Returns { status, message, data: { cryptoWallet, fiatWallet, transaction, notification } }
+      } else {
+        throw Exception('Failed to buy crypto: ${responseBody['message']}');
+      }
+    } else if (response.statusCode == 401) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('token');
+      throw Exception('Session expired. Please login again.');
+    } else {
+      final responseBody = jsonDecode(response.body);
+      throw Exception('Failed to buy crypto: ${responseBody['message'] ?? response.body}');
+    }
+  } catch (e) {
+    print('Buy Crypto Error: $e');
+    rethrow;
+  }
+}
 
   Future<List<CryptoWallet>> getCryptoWalletBalances() async {
     try {
       final token = await AuthManager().getAuthToken();
       print('Auth Token: $token');
       final response = await http.get(
-        Uri.parse('$baseUrl/api/wallet/fetchCryptoWalletBalances'),
+        Uri.parse('$BaseUrl/api/wallet/fetchCryptoWalletBalances'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
       );
 
-      print('API URL: $baseUrl/api/wallet/fetchCryptoWalletBalances');
+      print('API URL: $BaseUrl/api/wallet/fetchCryptoWalletBalances');
       print('Response Status: ${response.statusCode}');
       print('Response Body: ${response.body}');
 
@@ -147,14 +311,16 @@ class ApiService {
       final token = await AuthManager().getAuthToken();
       print(token);
       final response = await http.get(
-        Uri.parse('$baseUrl/api/wallet/fetchCryptoWalletAddresses'),
+        Uri.parse('$BaseUrl/api/wallet/fetchCryptoWalletAddresses'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
       );
 
-      print('API URL: $baseUrl/api/wallet/fetchCryptoWalletAddresses');
+      print(
+        'API URL: $BaseUrl/api/wallet/fetchCryptoWalletAddresses',
+      );
       print('Auth Token: $authToken');
       print('Response Status: ${response.statusCode}');
       print('Response Body: ${response.body}');
@@ -174,22 +340,19 @@ class ApiService {
       throw Exception('Error fetching crypto balances: $e');
     }
   }
-  
- 
-
 
   Future<List<Wallet>> getBalance() async {
     try {
       final token = await AuthManager().getAuthToken();
       final response = await http.get(
-        Uri.parse('$baseUrl/api/wallet/balance'),
+        Uri.parse('$BaseUrl/api/wallet/balance'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
       );
 
-      print('Balance Request URL: $baseUrl/api/wallet/balance');
+      print('Balance Request URL: $BaseUrl/api/wallet/balance');
       print(
         'Balance Request Headers: ${{'Content-Type': 'application/json', 'Authorization': 'Bearer $token'}}',
       );
@@ -212,11 +375,13 @@ class ApiService {
     }
   }
 
-  Future<Map<String, dynamic>> getBalanceForWalletPaymentUpdate(String userId) async {
+  Future<Map<String, dynamic>> getBalanceForWalletPaymentUpdate(
+    String userId,
+  ) async {
     try {
       final token = await AuthManager().getAuthToken();
       final response = await http.get(
-        Uri.parse('$baseUrl/api/wallet/balance?userId=$userId'),
+        Uri.parse('$BaseUrl/api/wallet/balance?userId=$userId'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -239,14 +404,16 @@ class ApiService {
       final token = await AuthManager().getAuthToken();
       print('Token: $token');
       final response = await http.get(
-        Uri.parse('$baseUrl/api/wallet/transactions'),
+        Uri.parse('$BaseUrl/api/wallet/transactions'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
       );
 
-      print('Transactions Request URL: $baseUrl/api/wallet/transactions');
+      print(
+        'Transactions Request URL: $BaseUrl/api/wallet/transactions',
+      );
       print('Transactions Response Status: ${response.statusCode}');
       print('Transactions Response Body: ${response.body}');
 
@@ -277,7 +444,7 @@ class ApiService {
     try {
       final token = await AuthManager().getAuthToken();
       final response = await http.post(
-        Uri.parse('$baseUrl/api/wallet/add-money/stripe'),
+        Uri.parse('$BaseUrl/api/wallet/add-money/stripe'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -319,8 +486,13 @@ class ApiService {
   ) async {
     try {
       final token = await AuthManager().getAuthToken();
+      print(
+        'Razorpay Request Payload: ${jsonEncode({'userId': userId, 'amount': amount, 'currency': currency})}',
+      );
+      print('Auth Token: $token');
+      print('Request URL: $BaseUrl/api/wallet/add-money/razorpay');
       final response = await http.post(
-        Uri.parse('$baseUrl/api/wallet/add-money/razorpay'),
+        Uri.parse('$BaseUrl/api/wallet/add-money/razorpay'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -336,15 +508,20 @@ class ApiService {
       print('Razorpay Payment Response Body: ${response.body}');
 
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        final responseBody = jsonDecode(response.body);
+        if (responseBody['orderId'] == null || responseBody['key'] == null) {
+          throw Exception('Invalid Razorpay response: Missing orderId or key');
+        }
+        return responseBody;
       } else if (response.statusCode == 401) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.remove('token');
-        throw Exception('Session expired. Please login again.');
+        throw Exception('Session expired. Please log in again.');
       } else {
-        throw Exception(
-          'Failed to initiate Razorpay payment: ${response.body}',
-        );
+        final responseBody = response.body.isNotEmpty
+            ? jsonDecode(response.body)
+            : {};
+        final errorMessage =
+            responseBody['error'] ?? 'No error details provided by server';
+        throw Exception('Failed to initiate Razorpay payment: $errorMessage');
       }
     } catch (e) {
       print('Razorpay Payment Error: $e');
@@ -356,7 +533,7 @@ class ApiService {
     try {
       final token = await AuthManager().getAuthToken();
       final response = await http.post(
-        Uri.parse('$baseUrl/api/wallet/withdraw'),
+        Uri.parse('$BaseUrl/api/wallet/withdraw'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -392,7 +569,7 @@ class ApiService {
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getString('userId') ?? '';
       final response = await http.post(
-        Uri.parse('$baseUrl/api/wallet/create'),
+        Uri.parse('$BaseUrl/api/wallet/create'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -425,7 +602,7 @@ class ApiService {
           ? currencies.map((c) => c.toLowerCase()).join(' OR ') + ' currency'
           : 'currency market';
       final url = Uri.parse(
-        '$_baseUrl/everything?q=$query&apiKey=$_newsApiKey&language=en&sortBy=publishedAt&pageSize=10',
+        '$_ProductionBaseUrl/everything?q=$query&apiKey=$_newsApiKey&language=en&sortBy=publishedAt&pageSize=10',
       );
       final response = await http.get(url);
 
@@ -453,7 +630,7 @@ class ApiService {
       final token = await AuthManager().getAuthToken();
       print('Sell Crypto Token: $token');
       final response = await http.post(
-        Uri.parse('$baseUrl/api/wallet/sellCrypto'),
+        Uri.parse('$BaseUrl/api/wallet/sellCrypto'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -495,7 +672,7 @@ class ApiService {
       }
 
       final url = Uri.parse(
-        '$baseUrl/api/wallet/fetchCompleteCryptoDetails?userId=$userId',
+        '$BaseUrl/api/wallet/fetchCompleteCryptoDetails?userId=$userId',
       );
 
       print('🔐 Token: $token');
@@ -530,7 +707,7 @@ class ApiService {
 
   Future<List<Map<String, dynamic>>> getSupportedAssets() async {
     final Token = await AuthManager().getAuthToken();
-    final url = Uri.parse('$baseUrl/api/wallet/getSupportedAssets');
+    final url = Uri.parse('$BaseUrl/api/wallet/getSupportedAssets');
     final response = await http.get(
       url,
       headers: {'Authorization': 'Bearer $Token'},
@@ -549,40 +726,211 @@ class ApiService {
     }
   }
 
-  Future<List<OrderData>> fetchSpotOrders() async {
+Future<List<OrderData>> fetchSpotOrders() async {
+  try {
+    final token = await AuthManager().getAuthToken();
+    print('Fetching Spot Orders with Token: $token');
+
+    final response = await http.get(
+      Uri.parse('$BaseUrl/api/wallet/fetchSpotOrders'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    print('Spot Orders Response Status: ${response.statusCode}');
+    print('Spot Orders Response Body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final jsonResponse = jsonDecode(response.body);
+      print('Decoded JSON: $jsonResponse');
+      final List<dynamic> data = jsonResponse['data'] ?? [];
+      print('Data field: $data');
+      if (data.isEmpty) {
+        print('No orders found in response data');
+        return [];
+      }
+      final orders = data.map((json) => OrderData.fromJson(json)).toList();
+      print('Parsed orders: $orders');
+      return orders;
+    } else if (response.statusCode == 401) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('token');
+      throw Exception('Session expired. Please login again.');
+    } else if (response.statusCode == 404) {
+      print('No orders found (404)');
+      return [];
+    } else {
+      throw Exception('Failed to fetch spot orders: ${response.body}');
+    }
+  } catch (e) {
+    print('Error fetching spot orders: $e');
+    throw Exception('Error fetching spot orders: $e');
+  }
+}
+
+  Future<Map<String, dynamic>> confirmStripePayment(String clientSecret) async {
     try {
       final token = await AuthManager().getAuthToken();
-      print('Fetching Spot Orders with Token: $token');
+      if (token == null) {
+        throw Exception('No auth token found. Please log in.');
+      }
 
-      final response = await http.get(
-        Uri.parse('$baseUrl/api/wallet/fetchSpotOrders'),
+      final response = await http.post(
+        Uri.parse('$BaseUrl/api/wallet/confirm-payment'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
+        body: jsonEncode({'clientSecret': clientSecret}),
       );
 
-      print('Spot Orders Response Status: ${response.statusCode}');
-      print('Spot Orders Response Body: ${response.body}');
+      print('Confirm Payment Response Status: ${response.statusCode}');
+      print('Confirm Payment Response Body: ${response.body}');
 
       if (response.statusCode == 200) {
-        final jsonResponse = jsonDecode(response.body);
-        final List<dynamic> data = jsonResponse['data'];
-
-        return data.map((json) => OrderData.fromJson(json)).toList();
+        final responseBody = jsonDecode(response.body);
+        print('Parsed Response: $responseBody');
+        if (responseBody['success'] == true) {
+          return responseBody; // Returns { success: true, message: 'Payment confirmed' }
+        } else {
+          throw Exception(
+            'Payment confirmation failed: ${responseBody['error']}',
+          );
+        }
+      } else if (response.statusCode == 400) {
+        final responseBody = jsonDecode(response.body);
+        throw Exception('Payment not successful: ${responseBody['error']}');
       } else if (response.statusCode == 401) {
         final prefs = await SharedPreferences.getInstance();
         await prefs.remove('token');
         throw Exception('Session expired. Please login again.');
-      } else if (response.statusCode == 404) {
-        // no orders found — just return empty list
-        return [];
       } else {
-        throw Exception('Failed to fetch spot orders: ${response.body}');
+        throw Exception('Failed to confirm payment: ${response.body}');
       }
     } catch (e) {
-      print('Error fetching spot orders: $e');
-      throw Exception('Error fetching spot orders: $e');
+      print('Confirm Payment Error: $e');
+      rethrow;
+    }
+  }
+  
+  Future<Map<String, dynamic>> confirmRazorpayPayment(String paymentId, String orderId) async {
+  try {
+    final token = await AuthManager().getAuthToken();
+    if (token == null) {
+      throw Exception('No auth token found. Please log in.');
+    }
+
+    final response = await http.post(
+      Uri.parse('$BaseUrl/api/wallet/confirm-payment/razorpay'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({
+        'paymentId': paymentId,
+        'orderId': orderId,
+      }),
+    );
+
+    print('Confirm Razorpay Payment Response Status: ${response.statusCode}');
+    print('Confirm Razorpay Payment Response Body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final responseBody = jsonDecode(response.body);
+      print('Parsed Response: $responseBody');
+      if (responseBody['status'] == 200) {
+        return responseBody; // Returns { status: 200, message: 'Payment confirmed successfully' }
+      } else {
+        throw Exception(
+          'Payment confirmation failed: ${responseBody['message']}',
+        );
+      }
+    } else if (response.statusCode == 400) {
+      final responseBody = jsonDecode(response.body);
+      throw Exception('Payment not successful: ${responseBody['message']}');
+    } else if (response.statusCode == 401) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('token');
+      throw Exception('Session expired. Please login again.');
+    } else {
+      throw Exception('Failed to confirm payment: ${response.body}');
+    }
+  } catch (e) {
+    print('Confirm Razorpay Payment Error: $e');
+    rethrow;
+  }
+}
+  
+
+  // New method: Save Notification
+  Future<void> saveNotification({
+    required String userId,
+    required String title,
+    required String message,
+    required String currency,
+    required double amount,
+  }) async {
+    final token = await AuthManager().getAuthToken(); 
+    final response = await http.post(
+      Uri.parse('$BaseUrl/api/wallet/Save_Notifications'),
+
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token}',
+      },
+      body: jsonEncode({
+        'userId': userId,
+        'title': title,
+        'message': message,
+        'currency': currency,
+        'amount': amount,
+      }),
+    );
+
+    if (response.statusCode != 201) {
+      throw Exception(
+        'Failed to save notification: ${jsonDecode(response.body)['message']}',
+      );
+    }
+  }
+
+  // New method: Fetch Notifications
+  Future<List<NotificationModel>> getNotifications() async {
+    final token = await AuthManager().getAuthToken();
+    final response = await http.get(
+      Uri.parse('$BaseUrl/api/wallet/Fetch_Notifications'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['status'] == 200) {
+        return (data['data'] as List)
+            .map((json) => NotificationModel.fromJson(json))
+            .toList();
+      }
+      throw Exception(data['message']);
+    }
+    throw Exception('Failed to fetch notifications: ${response.statusCode}');
+  }
+
+  // New method: Mark Notification as Read
+  Future<void> markNotificationAsRead(String notificationId) async {
+    final token = await AuthManager().getAuthToken();
+    final response = await http.patch(
+      Uri.parse('$BaseUrl/api/wallet/MarkReadAsnotifications/$notificationId/read'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Failed to mark notification as read: ${jsonDecode(response.body)['message']}',
+      );
     }
   }
 }

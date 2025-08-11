@@ -25,6 +25,7 @@ class _CryptoWalletScreenState extends State<CryptoWalletScreen> {
   bool isLoading = true;
   String? errorMessage;
   final ApiService apiService = ApiService();
+  bool isCreatingWallet = false; // New state variable for loading indicator
 
   // Map to store coin metadata (name -> image URL)
   Map<String, String> coinImages = {
@@ -102,6 +103,9 @@ class _CryptoWalletScreenState extends State<CryptoWalletScreen> {
   }
 
   Future<void> _prepareAndShowDialog() async {
+    setState(() {
+      isCreatingWallet = true; // Show loading indicator
+    });
     try {
       print('Fetching supported assets...');
       final assets = await apiService.getSupportedAssets();
@@ -115,6 +119,7 @@ class _CryptoWalletScreenState extends State<CryptoWalletScreen> {
       print('Filtered assets: ${filtered.length}');
       setState(() {
         _filteredAssets = filtered;
+        isCreatingWallet = false; // Hide loading indicator
       });
 
       _showCreateWalletDialog();
@@ -122,6 +127,7 @@ class _CryptoWalletScreenState extends State<CryptoWalletScreen> {
       print('Error while loading assets: $e');
       setState(() {
         errorMessage = 'Failed to load assets: $e';
+        isCreatingWallet = false; // Hide loading indicator on error
       });
     }
   }
@@ -174,6 +180,7 @@ class _CryptoWalletScreenState extends State<CryptoWalletScreen> {
   }
 
   Future<void> _createWallet(String coinName) async {
+    print('Creating wallet for coin: $coinName');
     setState(() => isLoading = true);
     try {
       final newWallet = await apiService.createWalletAddress(coinName);
@@ -339,10 +346,9 @@ class _CryptoWalletScreenState extends State<CryptoWalletScreen> {
                                       'Create button pressed for coin: $selectedCoin',
                                     );
                                     Navigator.pop(context);
-                                    final apiCoinName = selectedCoin == 'ETC'
-                                        ? 'ETC'
-                                        : mainnetToCoinName[selectedCoin] ??
-                                              selectedCoin!;
+                                    // Use the nativeAsset value directly (like DOGE_TEST)
+                                    final apiCoinName = selectedCoin!;
+                                    print('Using nativeAsset for wallet creation: $apiCoinName');
                                     await _createWallet(apiCoinName);
                                   },
                             style: ElevatedButton.styleFrom(
@@ -473,15 +479,15 @@ class _CryptoWalletScreenState extends State<CryptoWalletScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                     Container(
-                              width: 250,
-                              height: 250,
-                              child: Lottie.asset(
-                                'assets/lottie/Empty.json',
-                                fit: BoxFit.contain,
-                                repeat: true,
-                              ),
-                            ),
+                    Container(
+                      width: 250,
+                      height: 250,
+                      child: Lottie.asset(
+                        'assets/lottie/Empty.json',
+                        fit: BoxFit.contain,
+                        repeat: true,
+                      ),
+                    ),
                     Text(
                       'Please Request For Wallet Address To send a wallet request, tap the + icon.',
                       style: GoogleFonts.poppins(
@@ -713,10 +719,17 @@ class _CryptoWalletScreenState extends State<CryptoWalletScreen> {
               ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _prepareAndShowDialog,
+        onPressed: isCreatingWallet
+            ? null
+            : _prepareAndShowDialog, // Disable button when loading
         backgroundColor: Colors.amber,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: const Icon(Icons.add, color: Colors.black),
+        child: isCreatingWallet
+            ? CircularProgressIndicator(
+                padding: EdgeInsets.all(15),
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              )
+            : const Icon(Icons.add, color: Colors.black),
       ),
     );
   }

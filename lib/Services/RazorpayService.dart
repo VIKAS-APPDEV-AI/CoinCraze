@@ -1,7 +1,9 @@
 import 'package:razorpay_flutter/razorpay_flutter.dart';
+import 'dart:async';
 
 class RazorpayService {
   late Razorpay _razorpay;
+  late Completer<String?> _paymentCompleter;
 
   RazorpayService() {
     _razorpay = Razorpay();
@@ -11,32 +13,45 @@ class RazorpayService {
   }
 
   void _handlePaymentSuccess(PaymentSuccessResponse response) {
-    // Handle success (webhook will update balance)
+    _paymentCompleter.complete(response.paymentId);
   }
 
   void _handlePaymentError(PaymentFailureResponse response) {
-    throw Exception('Payment failed: ${response.message}');
+    _paymentCompleter.completeError(
+      Exception('Payment failed: ${response.message ?? 'Unknown error'}'),
+    );
   }
 
   void _handleExternalWallet(ExternalWalletResponse response) {
-    // Handle external wallet
+    _paymentCompleter.completeError(
+      Exception('External wallet selected: ${response.walletName}'),
+    );
   }
 
-  Future<void> makePayment(String orderId, String key, double amount, String currency) async {
+  Future<String?> makePayment(
+    String orderId,
+    String key,
+    double amount,
+    String currency,
+  ) async {
+    _paymentCompleter = Completer<String?>();
+
     var options = {
       'key': key,
       'amount': (amount * 100).toInt(),
       'currency': currency,
       'order_id': orderId,
-      'name': 'Your App Name',
+      'name': 'CoinCraze',
       'description': 'Wallet Top-up',
-      'prefill': {'contact': '', 'email': ''},
+      'prefill': {'contact': '7017174051', 'email': 'sharmavikas@itio.in'},
     };
 
     try {
       _razorpay.open(options);
+      return await _paymentCompleter.future;
     } catch (e) {
-      throw Exception('Payment failed: $e');
+      _paymentCompleter.completeError(Exception('Payment launch failed: $e'));
+      rethrow;
     }
   }
 
