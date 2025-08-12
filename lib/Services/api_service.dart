@@ -28,12 +28,12 @@ class ApiService {
       }
 
       final requestBody = jsonEncode({'coinName': coinName});
-      print('Request URL: $BaseUrl/api/wallet/createCryptoWallet');
+      print('Request URL: $ProductionBaseUrl/api/wallet/createCryptoWallet');
       print('Request Body: $requestBody');
       print('Request Headers: Content-Type: application/json, Authorization: Bearer $authToken');
       
       final response = await http.post(
-        Uri.parse('$BaseUrl/api/wallet/createCryptoWallet'),
+        Uri.parse('$ProductionBaseUrl/api/wallet/createCryptoWallet'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $authToken',
@@ -121,7 +121,7 @@ class ApiService {
       final formattedAmount = amount.toStringAsFixed(2);
       
       final url = Uri.parse(
-        '$BaseUrl/api/wallet/convert?from=$fromCurrency&to=$toCurrency&amount=$formattedAmount',
+        '$ProductionBaseUrl/api/wallet/convert?from=$fromCurrency&to=$toCurrency&amount=$formattedAmount',
       );
       
       print('Fetching exchange rate from: $url');
@@ -219,7 +219,7 @@ class ApiService {
     }
 
     final response = await http.post(
-      Uri.parse('$BaseUrl/api/wallet/buyCrypto'),
+      Uri.parse('$ProductionBaseUrl/api/wallet/buyCrypto'),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
@@ -235,7 +235,7 @@ class ApiService {
       }),
     );
 
-    print('Buy Crypto Request URL: $BaseUrl/api/wallet/buyCrypto');
+    print('Buy Crypto Request URL: $ProductionBaseUrl/api/wallet/buyCrypto');
     print('Buy Crypto Request Body: ${jsonEncode({
       'userId': userId,
       'cryptoWalletId': cryptoWalletId,
@@ -275,14 +275,14 @@ class ApiService {
       final token = await AuthManager().getAuthToken();
       print('Auth Token: $token');
       final response = await http.get(
-        Uri.parse('$BaseUrl/api/wallet/fetchCryptoWalletBalances'),
+        Uri.parse('$ProductionBaseUrl/api/wallet/fetchCryptoWalletBalances'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
       );
 
-      print('API URL: $BaseUrl/api/wallet/fetchCryptoWalletBalances');
+      print('API URL: $ProductionBaseUrl/api/wallet/fetchCryptoWalletBalances');
       print('Response Status: ${response.statusCode}');
       print('Response Body: ${response.body}');
 
@@ -311,7 +311,7 @@ class ApiService {
       final token = await AuthManager().getAuthToken();
       print(token);
       final response = await http.get(
-        Uri.parse('$BaseUrl/api/wallet/fetchCryptoWalletAddresses'),
+        Uri.parse('$ProductionBaseUrl/api/wallet/fetchCryptoWalletAddresses'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -319,7 +319,7 @@ class ApiService {
       );
 
       print(
-        'API URL: $BaseUrl/api/wallet/fetchCryptoWalletAddresses',
+        'API URL: $ProductionBaseUrl/api/wallet/fetchCryptoWalletAddresses',
       );
       print('Auth Token: $authToken');
       print('Response Status: ${response.statusCode}');
@@ -345,14 +345,14 @@ class ApiService {
     try {
       final token = await AuthManager().getAuthToken();
       final response = await http.get(
-        Uri.parse('$BaseUrl/api/wallet/balance'),
+        Uri.parse('$ProductionBaseUrl/api/wallet/balance'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
       );
 
-      print('Balance Request URL: $BaseUrl/api/wallet/balance');
+      print('Balance Request URL: $ProductionBaseUrl/api/wallet/balance');
       print(
         'Balance Request Headers: ${{'Content-Type': 'application/json', 'Authorization': 'Bearer $token'}}',
       );
@@ -381,7 +381,7 @@ class ApiService {
     try {
       final token = await AuthManager().getAuthToken();
       final response = await http.get(
-        Uri.parse('$BaseUrl/api/wallet/balance?userId=$userId'),
+        Uri.parse('$ProductionBaseUrl/api/wallet/balance?userId=$userId'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -404,7 +404,7 @@ class ApiService {
       final token = await AuthManager().getAuthToken();
       print('Token: $token');
       final response = await http.get(
-        Uri.parse('$BaseUrl/api/wallet/transactions'),
+        Uri.parse('$ProductionBaseUrl/api/wallet/transactions'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -412,7 +412,7 @@ class ApiService {
       );
 
       print(
-        'Transactions Request URL: $BaseUrl/api/wallet/transactions',
+        'Transactions Request URL: $ProductionBaseUrl/api/wallet/transactions',
       );
       print('Transactions Response Status: ${response.statusCode}');
       print('Transactions Response Body: ${response.body}');
@@ -444,7 +444,7 @@ class ApiService {
     try {
       final token = await AuthManager().getAuthToken();
       final response = await http.post(
-        Uri.parse('$BaseUrl/api/wallet/add-money/stripe'),
+        Uri.parse('$ProductionBaseUrl/api/wallet/add-money/stripe'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -490,9 +490,9 @@ class ApiService {
         'Razorpay Request Payload: ${jsonEncode({'userId': userId, 'amount': amount, 'currency': currency})}',
       );
       print('Auth Token: $token');
-      print('Request URL: $BaseUrl/api/wallet/add-money/razorpay');
+      print('Request URL: $ProductionBaseUrl/api/wallet/add-money/razorpay');
       final response = await http.post(
-        Uri.parse('$BaseUrl/api/wallet/add-money/razorpay'),
+        Uri.parse('$ProductionBaseUrl/api/wallet/add-money/razorpay'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -533,7 +533,7 @@ class ApiService {
     try {
       final token = await AuthManager().getAuthToken();
       final response = await http.post(
-        Uri.parse('$BaseUrl/api/wallet/withdraw'),
+        Uri.parse('$ProductionBaseUrl/api/wallet/withdraw'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -569,7 +569,7 @@ class ApiService {
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getString('userId') ?? '';
       final response = await http.post(
-        Uri.parse('$BaseUrl/api/wallet/create'),
+        Uri.parse('$ProductionBaseUrl/api/wallet/create'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -630,7 +630,7 @@ class ApiService {
       final token = await AuthManager().getAuthToken();
       print('Sell Crypto Token: $token');
       final response = await http.post(
-        Uri.parse('$BaseUrl/api/wallet/sellCrypto'),
+        Uri.parse('$ProductionBaseUrl/api/wallet/sellCrypto'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -672,7 +672,7 @@ class ApiService {
       }
 
       final url = Uri.parse(
-        '$BaseUrl/api/wallet/fetchCompleteCryptoDetails?userId=$userId',
+        '$ProductionBaseUrl/api/wallet/fetchCompleteCryptoDetails?userId=$userId',
       );
 
       print('🔐 Token: $token');
@@ -707,7 +707,7 @@ class ApiService {
 
   Future<List<Map<String, dynamic>>> getSupportedAssets() async {
     final Token = await AuthManager().getAuthToken();
-    final url = Uri.parse('$BaseUrl/api/wallet/getSupportedAssets');
+    final url = Uri.parse('$ProductionBaseUrl/api/wallet/getSupportedAssets');
     final response = await http.get(
       url,
       headers: {'Authorization': 'Bearer $Token'},
@@ -732,7 +732,7 @@ Future<List<OrderData>> fetchSpotOrders() async {
     print('Fetching Spot Orders with Token: $token');
 
     final response = await http.get(
-      Uri.parse('$BaseUrl/api/wallet/fetchSpotOrders'),
+      Uri.parse('$ProductionBaseUrl/api/wallet/fetchSpotOrders'),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
@@ -778,7 +778,7 @@ Future<List<OrderData>> fetchSpotOrders() async {
       }
 
       final response = await http.post(
-        Uri.parse('$BaseUrl/api/wallet/confirm-payment'),
+        Uri.parse('$ProductionBaseUrl/api/wallet/confirm-payment'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -823,7 +823,7 @@ Future<List<OrderData>> fetchSpotOrders() async {
     }
 
     final response = await http.post(
-      Uri.parse('$BaseUrl/api/wallet/confirm-payment/razorpay'),
+      Uri.parse('$ProductionBaseUrl/api/wallet/confirm-payment/razorpay'),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
@@ -874,7 +874,7 @@ Future<List<OrderData>> fetchSpotOrders() async {
   }) async {
     final token = await AuthManager().getAuthToken(); 
     final response = await http.post(
-      Uri.parse('$BaseUrl/api/wallet/Save_Notifications'),
+      Uri.parse('$ProductionBaseUrl/api/wallet/Save_Notifications'),
 
       headers: {
         'Content-Type': 'application/json',
@@ -900,7 +900,7 @@ Future<List<OrderData>> fetchSpotOrders() async {
   Future<List<NotificationModel>> getNotifications() async {
     final token = await AuthManager().getAuthToken();
     final response = await http.get(
-      Uri.parse('$BaseUrl/api/wallet/Fetch_Notifications'),
+      Uri.parse('$ProductionBaseUrl/api/wallet/Fetch_Notifications'),
       headers: {'Authorization': 'Bearer $token'},
     );
 
@@ -920,7 +920,7 @@ Future<List<OrderData>> fetchSpotOrders() async {
   Future<void> markNotificationAsRead(String notificationId) async {
     final token = await AuthManager().getAuthToken();
     final response = await http.patch(
-      Uri.parse('$BaseUrl/api/wallet/MarkReadAsnotifications/$notificationId/read'),
+      Uri.parse('$ProductionBaseUrl/api/wallet/MarkReadAsnotifications/$notificationId/read'),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',

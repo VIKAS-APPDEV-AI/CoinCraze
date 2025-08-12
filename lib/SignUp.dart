@@ -229,7 +229,7 @@ class _SignUpScreenState extends State<SignUpScreen>
 
     try {
       final response = await http.post(
-        Uri.parse('$BaseUrl/api/auth/signup'),
+        Uri.parse('$ProductionBaseUrl/api/auth/signup'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'email': emailController.text.trim(),

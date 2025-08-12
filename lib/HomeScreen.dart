@@ -11,10 +11,11 @@ import 'package:coincraze/Screens/SellCryptoScreen.dart';
 import 'package:coincraze/Screens/SettingsPage.dart';
 import 'package:coincraze/Screens/Transactions.dart';
 import 'package:coincraze/WalletList.dart';
-import 'package:coincraze/chartScreen.dart';
 import 'package:coincraze/deposit.dart';
 import 'package:coincraze/newKyc.dart';
 import 'package:coincraze/walletScreen.dart';
+import 'package:coincraze/Models/CryptoWallet.dart';
+import 'package:coincraze/Services/api_service.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -48,6 +49,10 @@ class _HomescreenState extends State<Homescreen> {
   bool isLoading = true;
   final ImagePicker _picker = ImagePicker();
   Timer? _priceUpdateTimer; // Timer for periodic updates
+  
+  // Bitcoin wallet address
+  String? bitcoinWalletAddress;
+  final ApiService _apiService = ApiService();
 
   @override
   void initState() {
@@ -56,6 +61,7 @@ class _HomescreenState extends State<Homescreen> {
     _fetchCryptoData();
     _checkHiveData();
     _checkKycStatus();
+    _fetchBitcoinWalletAddress(); // Fetch Bitcoin wallet address
     // Set up timer to fetch crypto data every 30 seconds
     // _priceUpdateTimer = Timer.periodic(Duration(seconds: 30), (timer) {
     //   _fetchCryptoData();
@@ -169,6 +175,48 @@ class _HomescreenState extends State<Homescreen> {
     await AuthManager().loadSavedDetails(); // Load AuthManager data
   }
 
+  // Fetch Bitcoin wallet address
+  Future<void> _fetchBitcoinWalletAddress() async {
+    try {
+      final wallets = await _apiService.getCryptoWalletBalances();
+      print('Fetched Wallets for Bitcoin address: $wallets');
+      
+      // Find Bitcoin wallet (check for different possible names)
+      final bitcoinWallet = wallets.firstWhere(
+        (wallet) => 
+          wallet.currency.toUpperCase() == 'BTC_TEST' ||
+          wallet.currency.toLowerCase() == 'bitcoin' ||
+          wallet.currency.toLowerCase() == 'btc' ||
+          wallet.currency.toLowerCase().contains('bitcoin') ||
+          wallet.currency.toLowerCase() == 'btc_test' ||
+          wallet.currency.toLowerCase().contains('btc'),
+        orElse: () => CryptoWallet(currency: ''),
+      );
+      
+      if (bitcoinWallet.currency.isNotEmpty && bitcoinWallet.address != null) {
+        print('Found Bitcoin wallet: ${bitcoinWallet.currency}, Address: ${bitcoinWallet.address}');
+        setState(() {
+          bitcoinWalletAddress = bitcoinWallet.address;
+        });
+        print('Bitcoin wallet address set: $bitcoinWalletAddress');
+      } else {
+        print('Bitcoin wallet not found. Available wallets:');
+        for (var wallet in wallets) {
+          print('- Currency: ${wallet.currency}, Address: ${wallet.address}');
+        }
+        setState(() {
+          bitcoinWalletAddress = 'Bitcoin wallet not found';
+        });
+      }
+    } catch (e) {
+      print('Error fetching Bitcoin wallet address: $e');
+      // Keep the default hardcoded address as fallback
+      setState(() {
+        bitcoinWalletAddress = 'tb1qtu8n3jz7q5zmdrelqc28lmvglf9fdkluhelw7e';
+      });
+    }
+  }
+
   Future<void> _fetchCryptoData() async {
     setState(() {
       isLoading = true;
@@ -244,6 +292,7 @@ class _HomescreenState extends State<Homescreen> {
 
   Future<void> _refreshData() async {
     await _fetchCryptoData();
+    await _fetchBitcoinWalletAddress(); // Also refresh Bitcoin wallet address
   }
 
   Future<void> _pickAndUploadImage() async {
@@ -671,7 +720,7 @@ class _HomescreenState extends State<Homescreen> {
                               radius: MediaQuery.of(context).size.width * 0.07,
                               backgroundImage: profilePicture != null
                                   ? CachedNetworkImageProvider(
-                                      '$BaseUrl/$profilePicture',
+                                      '$ProductionBaseUrl/$profilePicture',
                                     )
                                   : const AssetImage(
                                           'assets/images/ProfileImage.jpg',
@@ -983,7 +1032,7 @@ class _HomescreenState extends State<Homescreen> {
                                           0.06,
                                       backgroundImage: profilePicture != null
                                           ? CachedNetworkImageProvider(
-                                              '$BaseUrl/$profilePicture',
+                                              '$ProductionBaseUrl/$profilePicture',
                                             )
                                           : const AssetImage(
                                                   'assets/images/ProfileImage.jpg',
@@ -1110,7 +1159,7 @@ class _HomescreenState extends State<Homescreen> {
                                       children: [
                                         Flexible(
                                           child: Text(
-                                            'tb1qtu8n3jz7q5zmdrelqc28lmvglf9fdkluhelw7e',
+                                            bitcoinWalletAddress ?? 'tb1qpj3lnlytpn6s0jrvxy6d8the5nfwkncqzqragp',
                                             style: GoogleFonts.poppins(
                                               fontSize:
                                                   MediaQuery.of(
@@ -1131,28 +1180,48 @@ class _HomescreenState extends State<Homescreen> {
                                         ),
                                         GestureDetector(
                                           onTap: () {
-                                            Clipboard.setData(
-                                              const ClipboardData(
-                                                text:
-                                                    'tb1qtu8n3jz7q5zmdrelqc28lmvglf9fdkluhelw7e',
-                                              ),
-                                            );
-                                            ScaffoldMessenger.of(
-                                              context,
-                                            ).showSnackBar(
-                                              SnackBar(
-                                                content: Text(
-                                                  'Address copied to clipboard',
-                                                  style: TextStyle(
-                                                    fontSize:
-                                                        MediaQuery.of(
-                                                          context,
-                                                        ).size.width *
-                                                        0.04,
-                                                  ),
+                                            if (bitcoinWalletAddress != null) {
+                                              Clipboard.setData(
+                                                ClipboardData(
+                                                  text: bitcoinWalletAddress!,
                                                 ),
-                                              ),
-                                            );
+                                              );
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                SnackBar(
+                                                  content: Text(
+                                                    'Bitcoin address copied to clipboard',
+                                                    style: TextStyle(
+                                                      fontSize:
+                                                          MediaQuery.of(
+                                                            context,
+                                                          ).size.width *
+                                                          0.04,
+                                                    ),
+                                                  ),
+                                                  backgroundColor: Colors.green,
+                                                ),
+                                              );
+                                            } else {
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                SnackBar(
+                                                  content: Text(
+                                                    'Bitcoin address not available yet',
+                                                    style: TextStyle(
+                                                      fontSize:
+                                                          MediaQuery.of(
+                                                            context,
+                                                          ).size.width *
+                                                          0.04,
+                                                    ),
+                                                  ),
+                                                  backgroundColor: Colors.red,
+                                                ),
+                                              );
+                                            }
                                           },
                                           child: Icon(
                                             Icons.content_copy,

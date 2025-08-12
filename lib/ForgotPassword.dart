@@ -83,7 +83,7 @@ class _ForgotPasswordState extends State<ForgotPassword>
 
     try {
       final response = await http.post(
-        Uri.parse('$BaseUrl/api/auth/forgot-password'),
+        Uri.parse('$ProductionBaseUrl/api/auth/forgot-password'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({'email': email}),
       );
@@ -164,9 +164,9 @@ class _ForgotPasswordState extends State<ForgotPassword>
 
   //   // API call to backend
   //   try {
-  //     print('Sending request to $BaseUrl');
+  //     print('Sending request to $ProductionBaseUrl');
   //     final response = await http.post(
-  //       Uri.parse('$BaseUrl/login'),
+  //       Uri.parse('$ProductionBaseUrl/login'),
   //       headers: {'Content-Type': 'application/json'},
   //       body: json.encode({'email': email, 'password': password}),
   //     );
@@ -301,6 +301,10 @@ class _ForgotPasswordState extends State<ForgotPassword>
                           child: TextField(
                             controller: emailController,
                             keyboardType: TextInputType.emailAddress,
+                            style: GoogleFonts.poppins(
+                              color: Colors
+                                  .black, // 👈 Yahan apna text color set karo
+                            ),
                             decoration: InputDecoration(
                               prefixIcon: const Icon(
                                 Icons.email,
@@ -368,7 +372,7 @@ class _ForgotPasswordState extends State<ForgotPassword>
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.arrow_back),
+                              Icon(Icons.arrow_back, color: Colors.black),
                               SizedBox(width: 15),
                               GestureDetector(
                                 onTap: () {

@@ -2,10 +2,12 @@ import 'package:coincraze/AuthManager.dart';
 import 'package:coincraze/BottomBar.dart'; // Assuming this is your MainScreen
 import 'package:coincraze/LoginScreen.dart';
 import 'package:coincraze/OnboardingScreen.dart';
+import 'package:coincraze/theme/theme_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hive/hive.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:provider/provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,7 +31,12 @@ void main() async {
     initialScreen = MainScreen(); // This is your main/home screen
   }
 
-  runApp(MyApp(initialScreen: initialScreen));
+  runApp(
+    ChangeNotifierProvider(
+      create: (context) => ThemeProvider(),
+      child: MyApp(initialScreen: initialScreen),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -38,14 +45,25 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'CoinCraze',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        textTheme: GoogleFonts.poppinsTextTheme(Theme.of(context).textTheme),
-      ),
-      home: initialScreen,
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          title: 'CoinCraze',
+          theme: themeProvider.lightTheme.copyWith(
+            textTheme: GoogleFonts.poppinsTextTheme(
+              themeProvider.lightTheme.textTheme,
+            ),
+          ),
+          darkTheme: themeProvider.darkTheme.copyWith(
+            textTheme: GoogleFonts.poppinsTextTheme(
+              themeProvider.darkTheme.textTheme,
+            ),
+          ),
+          themeMode: themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+          home: initialScreen,
+        );
+      },
     );
   }
 }

@@ -3,7 +3,9 @@ import 'package:coincraze/CreateWallet.dart';
 import 'package:coincraze/Models/Wallet.dart';
 import 'package:coincraze/Screens/AddFundsScreen.dart';
 import 'package:coincraze/Screens/BuyCryptoScreen.dart';
+import 'package:coincraze/Screens/DetailsTransacitonScreen.dart';
 import 'package:coincraze/Screens/TransactionScreen.dart';
+import 'package:coincraze/Screens/Transactions.dart';
 import 'package:coincraze/Services/api_service.dart';
 import 'package:country_flags/country_flags.dart';
 import 'package:flutter/material.dart';
@@ -745,7 +747,7 @@ class _FiatWalletScreenState extends State<FiatWalletScreen>
                             context,
                             MaterialPageRoute(
                               builder: (context) =>
-                                  TransactionHistoryScreen(userId: userId),
+                                  DetailsTransactionScreen(),
                             ),
                           );
                         },

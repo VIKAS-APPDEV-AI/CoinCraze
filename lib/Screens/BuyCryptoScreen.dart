@@ -485,7 +485,7 @@ class _BuyCryptoScreenState extends State<BuyCryptoScreen> {
 
     // Step 1: Update Crypto Wallet Balance
     final cryptoResponse = await http.post(
-      Uri.parse('$BaseUrl/api/wallet/CryptoAmountUpdate'),
+      Uri.parse('$ProductionBaseUrl/api/wallet/CryptoAmountUpdate'),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
@@ -507,7 +507,7 @@ class _BuyCryptoScreenState extends State<BuyCryptoScreen> {
 
     // Step 2: Update Fiat Wallet Balance (Deduct total amount)
     final fiatResponse = await http.post(
-      Uri.parse('$BaseUrl/api/wallet/FiatAmountUpdate'),
+      Uri.parse('$ProductionBaseUrl/api/wallet/FiatAmountUpdate'),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',

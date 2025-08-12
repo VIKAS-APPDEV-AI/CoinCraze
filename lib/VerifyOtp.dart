@@ -66,7 +66,7 @@ class _VerifyOtpState extends State<VerifyOtp>
 
     try {
       final response = await http.post(
-        Uri.parse('$BaseUrl/api/auth/verify-otp'),
+        Uri.parse('$ProductionBaseUrl/api/auth/verify-otp'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({'email': widget.email, 'otp': otp}),
       );

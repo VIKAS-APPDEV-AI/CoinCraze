@@ -144,30 +144,33 @@ class _CreateWalletScreenState extends State<CreateWalletScreen>
                               SizedBox(height: 24),
                               DropdownButtonFormField<String>(
                                 value: _selectedCurrency,
+                                style: const TextStyle(
+                                  // Selected text ka color force kar diya
+                                  color: Colors.black,
+                                  fontSize: 16,
+                                ),
+                                dropdownColor:
+                                    Colors.white, // Dropdown list ka background
                                 decoration: InputDecoration(
                                   labelText: 'Currency',
-                                  // prefixIcon: Padding(
-                                  //   padding: const EdgeInsets.all(12.0),
-                                  //   child: Text(
-                                  //     '${getFlagEmoji(_selectedCurrency ?? '')}',
-                                  //     style: const TextStyle(fontSize: 20),
-                                  //   ),
-                                  // ),
+                                  labelStyle: const TextStyle(
+                                    color: Colors.black,
+                                  ), // Label ka color
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   filled: true,
                                   fillColor: Colors.grey[100],
                                 ),
-                                hint: const Text('Select Currency'),
-                                items: _currencies.map((
-                                  currency,
-                                ) {
+                                hint: const Text(
+                                  'Select Currency',
+                                  style: TextStyle(color: Colors.black),
+                                ),
+                                items: _currencies.map((currency) {
                                   final symbol = CurrencyHelper.getSymbol(
                                     currency,
                                   );
                                   final flag = getFlagEmoji(currency);
-
                                   return DropdownMenuItem<String>(
                                     value: currency,
                                     child: Row(
@@ -177,7 +180,12 @@ class _CreateWalletScreenState extends State<CreateWalletScreen>
                                           style: const TextStyle(fontSize: 18),
                                         ),
                                         const SizedBox(width: 8),
-                                        Text('$symbol $currency'),
+                                        Text(
+                                          '$symbol $currency',
+                                          style: const TextStyle(
+                                            color: Colors.black,
+                                          ),
+                                        ),
                                       ],
                                     ),
                                   );

@@ -372,7 +372,7 @@ class _NewKYCState extends State<NewKYC> with TickerProviderStateMixin {
 
       var request = http.MultipartRequest(
         'POST',
-        Uri.parse('$BaseUrl/api/kyc/submit-kyc'),
+        Uri.parse('$ProductionBaseUrl/api/kyc/submit-kyc'),
       );
       request.headers['Authorization'] = 'Bearer $token';
       request.fields['userId'] = userId;

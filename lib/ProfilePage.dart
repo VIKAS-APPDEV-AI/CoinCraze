@@ -80,7 +80,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     radius: 50,
                     backgroundImage: profilePicture != null
                         ? CachedNetworkImageProvider(
-                            '$BaseUrl/$profilePicture',
+                            '$ProductionBaseUrl/$profilePicture',
                           )
                         : AssetImage('assets/images/ProfileImage.jpg')
                             as ImageProvider,

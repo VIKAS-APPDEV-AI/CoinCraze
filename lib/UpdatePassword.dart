@@ -17,7 +17,8 @@ class UpdatePassword extends StatefulWidget {
 class _UpdatePasswordState extends State<UpdatePassword>
     with SingleTickerProviderStateMixin {
   final TextEditingController passwordController = TextEditingController();
-  final TextEditingController confirmPasswordController = TextEditingController();
+  final TextEditingController confirmPasswordController =
+      TextEditingController();
   bool _isLoading = false;
   late AnimationController _animationController;
   late Animation<Offset> _slideAnimation;
@@ -31,9 +32,10 @@ class _UpdatePasswordState extends State<UpdatePassword>
       duration: const Duration(seconds: 2),
       vsync: this,
     );
-    _slideAnimation = Tween<Offset>(begin: const Offset(2, 0.4), end: Offset.zero).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.ease),
-    );
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(2, 0.4), end: Offset.zero).animate(
+          CurvedAnimation(parent: _animationController, curve: Curves.ease),
+        );
     _animationController.forward();
   }
 
@@ -63,7 +65,7 @@ class _UpdatePasswordState extends State<UpdatePassword>
 
     try {
       final response = await http.post(
-        Uri.parse('$BaseUrl/api/auth/reset-password'),
+        Uri.parse('$ProductionBaseUrl/api/auth/reset-password'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({'email': widget.email, 'newPassword': password}),
       );
@@ -99,7 +101,8 @@ class _UpdatePasswordState extends State<UpdatePassword>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SizedBox.expand( // ✅ Ensures full screen gradient
+      body: SizedBox.expand(
+        // ✅ Ensures full screen gradient
         child: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
@@ -142,7 +145,10 @@ class _UpdatePasswordState extends State<UpdatePassword>
                       ),
                     ),
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 10.0),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 32.0,
+                        vertical: 10.0,
+                      ),
                       child: Column(
                         children: [
                           const SizedBox(height: 20),
@@ -176,11 +182,17 @@ class _UpdatePasswordState extends State<UpdatePassword>
                             child: TextField(
                               controller: passwordController,
                               obscureText: _obscurePassword,
+                              style: GoogleFonts.poppins(color: Colors.black),
                               decoration: InputDecoration(
-                                prefixIcon: const Icon(Icons.lock, color: Colors.grey),
+                                prefixIcon: const Icon(
+                                  Icons.lock,
+                                  color: Colors.grey,
+                                ),
                                 suffixIcon: IconButton(
                                   icon: Icon(
-                                    _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                                    _obscurePassword
+                                        ? Icons.visibility_off
+                                        : Icons.visibility,
                                     color: Colors.grey,
                                   ),
                                   onPressed: () {
@@ -190,7 +202,9 @@ class _UpdatePasswordState extends State<UpdatePassword>
                                   },
                                 ),
                                 hintText: 'New Password',
-                                hintStyle: GoogleFonts.poppins(color: Colors.grey),
+                                hintStyle: GoogleFonts.poppins(
+                                  color: Colors.grey,
+                                ),
                                 filled: true,
                                 fillColor: Colors.grey[100],
                                 border: OutlineInputBorder(
@@ -206,8 +220,15 @@ class _UpdatePasswordState extends State<UpdatePassword>
                             child: TextField(
                               controller: confirmPasswordController,
                               obscureText: _obscureConfirmPassword,
+                              style: GoogleFonts.poppins(
+                                color: Colors
+                                    .black,
+                              ),
                               decoration: InputDecoration(
-                                prefixIcon: const Icon(Icons.lock, color: Colors.grey),
+                                prefixIcon: const Icon(
+                                  Icons.lock,
+                                  color: Colors.grey,
+                                ),
                                 suffixIcon: IconButton(
                                   icon: Icon(
                                     _obscureConfirmPassword
@@ -217,12 +238,15 @@ class _UpdatePasswordState extends State<UpdatePassword>
                                   ),
                                   onPressed: () {
                                     setState(() {
-                                      _obscureConfirmPassword = !_obscureConfirmPassword;
+                                      _obscureConfirmPassword =
+                                          !_obscureConfirmPassword;
                                     });
                                   },
                                 ),
                                 hintText: 'Confirm Password',
-                                hintStyle: GoogleFonts.poppins(color: Colors.grey),
+                                hintStyle: GoogleFonts.poppins(
+                                  color: Colors.grey,
+                                ),
                                 filled: true,
                                 fillColor: Colors.grey[100],
                                 border: OutlineInputBorder(
@@ -250,9 +274,14 @@ class _UpdatePasswordState extends State<UpdatePassword>
                                         vertical: 16.0,
                                       ),
                                       shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(15.0),
+                                        borderRadius: BorderRadius.circular(
+                                          15.0,
+                                        ),
                                       ),
-                                      minimumSize: const Size(double.infinity, 50),
+                                      minimumSize: const Size(
+                                        double.infinity,
+                                        50,
+                                      ),
                                     ),
                                     child: Text(
                                       'Reset Password',
@@ -270,7 +299,7 @@ class _UpdatePasswordState extends State<UpdatePassword>
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Icon(Icons.arrow_back),
+                                const Icon(Icons.arrow_back, color: Colors.black,),
                                 const SizedBox(width: 15),
                                 GestureDetector(
                                   onTap: () => Navigator.push(
@@ -283,7 +312,12 @@ class _UpdatePasswordState extends State<UpdatePassword>
                                     'Back To Login',
                                     style: GoogleFonts.poppins(
                                       fontSize: 14.0,
-                                      color: const Color.fromARGB(255, 11, 11, 11),
+                                      color: const Color.fromARGB(
+                                        255,
+                                        11,
+                                        11,
+                                        11,
+                                      ),
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),

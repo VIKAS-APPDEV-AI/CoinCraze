@@ -6,6 +6,7 @@ import 'package:coincraze/HomeScreen.dart';
 import 'package:coincraze/LoginScreen.dart';
 import 'package:coincraze/Models/Wallet.dart';
 import 'package:coincraze/Services/api_service.dart';
+import 'package:coincraze/theme/theme_provider.dart';
 import 'package:coincraze/utils/CurrencySymbol.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -14,6 +15,7 @@ import 'package:hive/hive.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -188,7 +190,7 @@ class _CryptoSettingsPageState extends State<CryptoSettingsPage>
     try {
       final token = await AuthManager().getAuthToken();
       final response = await http.get(
-        Uri.parse('$BaseUrl/api/settings/settings'),
+        Uri.parse('$ProductionBaseUrl/api/settings/settings'),
         headers: {'Authorization': 'Bearer $token'},
       );
       if (response.statusCode == 200) {
@@ -221,7 +223,7 @@ class _CryptoSettingsPageState extends State<CryptoSettingsPage>
     try {
       final token = await AuthManager().getAuthToken();
       final response = await http.put(
-        Uri.parse('$BaseUrl/api/settings/update-security'),
+        Uri.parse('$ProductionBaseUrl/api/settings/update-security'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -255,7 +257,7 @@ class _CryptoSettingsPageState extends State<CryptoSettingsPage>
     try {
       final token = await AuthManager().getAuthToken();
       final response = await http.put(
-        Uri.parse('$BaseUrl/api/settings/update-preferences'),
+        Uri.parse('$ProductionBaseUrl/api/settings/update-preferences'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -290,7 +292,7 @@ class _CryptoSettingsPageState extends State<CryptoSettingsPage>
     try {
       final token = await AuthManager().getAuthToken();
       final response = await http.put(
-        Uri.parse('$BaseUrl/api/settings/update-notifications'),
+        Uri.parse('$ProductionBaseUrl/api/settings/update-notifications'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -328,7 +330,7 @@ class _CryptoSettingsPageState extends State<CryptoSettingsPage>
     try {
       final token = await AuthManager().getAuthToken();
       final response = await http.put(
-        Uri.parse('$BaseUrl/api/settings/change-password'),
+        Uri.parse('$ProductionBaseUrl/api/settings/change-password'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -374,29 +376,37 @@ class _CryptoSettingsPageState extends State<CryptoSettingsPage>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: isDarkTheme ? Colors.black : Colors.white,
-      appBar: AppBar(
-        leading: InkWell(
-          onTap: () {
-            Navigator.push(
-              context,
-              CupertinoPageRoute(builder: (context) => MainScreen()),
-            );
-          },
-          child: Icon(Icons.arrow_back, color: Colors.black),
-        ),
-        title: Text(
-          'Profile Page',
-          style: TextStyle(color: isDarkTheme ? Colors.white : Colors.black),
-        ),
-        centerTitle: true,
-        elevation: 0,
-        backgroundColor: isDarkTheme ? Colors.black : Colors.white,
-        iconTheme: IconThemeData(
-          color: isDarkTheme ? Colors.white : Colors.black,
-        ),
-      ),
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        // Sync local isDarkTheme with ThemeProvider
+        isDarkTheme = themeProvider.isDarkMode;
+        
+        return Scaffold(
+          backgroundColor: isDarkTheme ? Colors.black : Colors.white,
+          appBar: AppBar(
+            leading: InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  CupertinoPageRoute(builder: (context) => MainScreen()),
+                );
+              },
+              child: Icon(
+                Icons.arrow_back, 
+                color: isDarkTheme ? Colors.white : Colors.black,
+              ),
+            ),
+            title: Text(
+              'Profile Page',
+              style: TextStyle(color: isDarkTheme ? Colors.white : Colors.black),
+            ),
+            centerTitle: true,
+            elevation: 0,
+            backgroundColor: isDarkTheme ? Colors.black : Colors.white,
+            iconTheme: IconThemeData(
+              color: isDarkTheme ? Colors.white : Colors.black,
+            ),
+          ),
       body: isLoading
           ? Center(
               child: CircularProgressIndicator(
@@ -418,7 +428,7 @@ class _CryptoSettingsPageState extends State<CryptoSettingsPage>
                           radius: 50,
                           backgroundImage: profilePicture != null
                               ? CachedNetworkImageProvider(
-                                  '$BaseUrl/$profilePicture',
+                                  '$ProductionBaseUrl/$profilePicture',
                                 )
                               : AssetImage('assets/images/ProfileImage.jpg')
                                     as ImageProvider,
@@ -495,25 +505,30 @@ class _CryptoSettingsPageState extends State<CryptoSettingsPage>
                   color: isDarkTheme ? Colors.grey[800] : Colors.grey[300],
                 ),
                 _buildSectionTitle('App Preferences'),
-                SwitchListTile(
-                  title: Text(
-                    'Dark Theme',
-                    style: TextStyle(
-                      color: isDarkTheme ? Colors.white : Colors.black,
-                    ),
-                  ),
-                  value: isDarkTheme,
-                  onChanged: (val) {
-                    setState(() => isDarkTheme = val);
-                    _updatePreferences();
+                Consumer<ThemeProvider>(
+                  builder: (context, themeProvider, child) {
+                    return SwitchListTile(
+                      title: Text(
+                        'Dark Theme',
+                        style: TextStyle(
+                          color: themeProvider.isDarkMode ? Colors.white : Colors.black,
+                        ),
+                      ),
+                      value: themeProvider.isDarkMode,
+                      onChanged: (val) {
+                        themeProvider.toggleTheme();
+                        setState(() => isDarkTheme = val);
+                        _updatePreferences();
+                      },
+                      secondary: Icon(
+                        themeProvider.isDarkMode ? Icons.dark_mode : Icons.sunny,
+                        color: themeProvider.isDarkMode ? Colors.white : Colors.black,
+                      ),
+                      activeColor: themeProvider.isDarkMode ? Colors.white : Colors.blue,
+                      inactiveThumbColor: themeProvider.isDarkMode ? Colors.grey[400] : null,
+                      inactiveTrackColor: themeProvider.isDarkMode ? Colors.grey[700] : null,
+                    );
                   },
-                  secondary: Icon(
-                    isDarkTheme ? Icons.dark_mode : Icons.sunny,
-                    color: isDarkTheme ? Colors.white : Colors.black,
-                  ),
-                  activeColor: isDarkTheme ? Colors.white : Colors.blue,
-                  inactiveThumbColor: isDarkTheme ? Colors.grey[400] : null,
-                  inactiveTrackColor: isDarkTheme ? Colors.grey[700] : null,
                 ),
                 FutureBuilder<List<Wallet>>(
                   future: _walletsFuture,
@@ -782,6 +797,8 @@ class _CryptoSettingsPageState extends State<CryptoSettingsPage>
                 ),
               ],
             ),
+        );
+      },
     );
   }
 

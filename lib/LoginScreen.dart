@@ -99,9 +99,9 @@ class _LoginScreenState extends State<LoginScreen>
     }
 
     try {
-      print('Sending request to $BaseUrl/api/auth/login');
+      print('Sending request to $ProductionBaseUrl/api/auth/login');
       final response = await http.post(
-        Uri.parse('$BaseUrl/api/auth/login'),
+        Uri.parse('$ProductionBaseUrl/api/auth/login'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({'email': email, 'password': password}),
       );
